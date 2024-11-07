@@ -30,21 +30,22 @@ services:
       - traefik.http.routers.nextcloud.rule=Host(`nuage.${DOMAIN}`)
       - traefik.http.routers.nextcloud.entrypoints=entrypoints-https       
       - traefik.http.services.nextcloud.loadbalancer.server.port=80
-
-      # - traefik.http.routers.nextcloud.middlewares=nextcloud_mid
-      # - traefik.http.middlewares.nextcloud_mid.headers.customFrameOptionsValue=ALLOW
-      # - traefik.http.middlewares.nextcloud_mid.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-      # - traefik.http.middlewares.nextcloud_mid.headers.stsIncludeSubdomains=true
-      # - traefik.http.middlewares.nextcloud_mid.headers.stsPreload=true
-      # - traefik.http.middlewares.nextcloud_mid.headers.accesscontrolalloworigin=*
-      # - traefik.http.middlewares.nextcloud_mid.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
+      
+      # - traefik.http.routers.nextcloud.middlewares=nextcloud,nextcloud_redirect
+      # - traefik.http.routers.nextcloud.middlewares=nextcloud
+      # - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
+      # - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+      # - traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011
+      # - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
+      # - traefik.http.middlewares.nextcloud.headers.stsPreload=true
+      # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
+      # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
 
       # Pour traefik > v2
       - traefik.http.routers.nextcloud.middlewares=nextcloud_redirectregex
       - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true
       - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav
       - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav
-      - traefik.http.middlewares.nextcloud_redirectregex.headers.stsSeconds=155520011
 
   # onlyoffice:
   #   container_name: onlyoffice
