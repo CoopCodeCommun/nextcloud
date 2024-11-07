@@ -3,7 +3,7 @@ services:
     image: postgres:13-bookworm 
     restart: always                                            
     container_name: nextcloud_db                                                                                          
-    hostname: lespass_postgres                                                                                                    ports:             
+    hostname: nextcloud_db                                                                                                    ports:             
     volumes:               
      - ./database:/var/lib/postgresql/data                   
     env_file: .env   
@@ -16,7 +16,7 @@ services:
     depends_on:
       - nextcloud_db
     volumes:
-      - ../data/www/html:/var/www/html
+      - ./data/www/html:/var/www/html
     networks:
       - nextcloud_db
       - frontend
