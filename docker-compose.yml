@@ -31,7 +31,7 @@ services:
       - traefik.http.routers.nextcloud.entrypoints=entrypoints-https       
       - traefik.http.services.nextcloud.loadbalancer.server.port=80
 
-      - traefik.http.routers.nextcloud.middlewares=nextcloud_mid
+      # - traefik.http.routers.nextcloud.middlewares=nextcloud_mid
       # - traefik.http.middlewares.nextcloud_mid.headers.customFrameOptionsValue=ALLOW
       # - traefik.http.middlewares.nextcloud_mid.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
       # - traefik.http.middlewares.nextcloud_mid.headers.stsIncludeSubdomains=true
