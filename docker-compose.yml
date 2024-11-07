@@ -84,9 +84,9 @@ services:
 
 networks:
   frontend:
-    internal: true
-  nextcloud_db:
     external: true
+  nextcloud_db:
+    internal: true
 
 
 # allow to set onlyoffice as local conainer
