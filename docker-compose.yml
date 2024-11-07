@@ -1,0 +1,108 @@
+services:
+  nextcloud_db:
+    image: postgres:13-bookworm 
+    restart: always                                            
+    container_name: nextcloud_db                                                                                          
+    hostname: lespass_postgres                                                                                                    ports:             
+    volumes:               
+     - ./database:/var/lib/postgresql/data                   
+    env_file: .env   
+    networks:            
+      - nextcloud_db      
+
+  nextcloud_app:  
+    image: nextcloud:30
+    restart: always
+    depends_on:
+      - nextcloud_db
+    volumes:
+      - ../data/www/html:/var/www/html
+    networks:
+      - nextcloud_db
+      - frontend
+
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=frontend
+
+      - traefik.http.routers.nextcloud.middlewares=nextcloud,nextcloud_redirect
+      - traefik.http.routers.nextcloud.tls.certresolver=myresolver
+      - traefik.http.routers.nextcloud.rule=Host(`nuage.${DOMAIN}`)
+
+      - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
+      - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+      - traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011
+      - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.nextcloud.headers.stsPreload=true
+      - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
+      - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
+
+      # Pour traefik 1
+      # - traefik.http.middlewares.nextcloud_redirect.redirectregex.regex=/.well-known/(card|cal)dav
+      # - traefik.http.middlewares.nextcloud_redirect.redirectregex.replacement=/remote.php/dav/
+
+
+      # Pour traefik > v2
+      - traefik.http.middlewares.nextcloud_redirect.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav
+      - traefik.http.middlewares.nextcloud_redirect.redirectregex.replacement=https://$${1}/remote.php/dav
+      - traefik.http.middlewares.nextcloud_redirect.redirectregex.permanent=true
+
+
+
+  onlyoffice:
+    container_name: onlyoffice
+    hostname: onlyoffice
+    depends_on:
+      - nextcloud_app
+    image: onlyoffice/documentserver:8.2
+    restart: always
+    networks:
+      - frontend
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=frontend
+
+      - traefik.http.routers.onlyoffice.middlewares=onlyoffice
+      - traefik.http.routers.onlyoffice.tls.certresolver=myresolver
+      - traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.${DOMAIN}`)
+      
+      - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}
+      - traefik.http.middlewares.onlyoffice.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+      - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
+      - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
+
+
+      ## Extra headers for onlyoffice
+      - traefik.http.routers.onlyoffice.tls=true
+      - traefik.http.middlewares.cors-headers.headers.accessControlAllowOrigin=*
+      - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
+      - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
+
+
+networks:
+  frontend:
+    external: true
+  nextcloud_db:
+    internal: true
+
+
+# allow to set onlyoffice as local conainer
+# command: sudo -u www-data sh -c "php occ --no-warnings config:system:set allow_local_remote_servers --value=true"
+
+# docker-compose exec --user www-data nextcloud_app php occ db:add-missing-indices
+
+
+
+# allow to set onlyoffice as local conainer
+# command: sudo -u www-data sh -c "php occ --no-warnings config:system:set allow_local_remote_servers --value=true"
+
+# Exemple pour reconstruire les index après une maj :
+# docker compose exec --user www-data nextcloud_app php occ db:add-missing-indices
+
+# Scanner les fichier sur disque dur et reconstruire la base de donnée ( utilse en cas de suppression de fichier depuis le terminal ) 
+# docker compose exec --user www-data nextcloud_app php occ files:scan jonas
+# docker compose exec --user www-data nextcloud_app php occ files:scan --path="Ekopratik/files/Ekopratik/2. Administration/2.2 Salariat/2.2.1 En cours/"
+# docker compose exec --user www-data nextcloud_app php occ trashbin:cleanup Ekopratik
+
+# docker compose exec --user www-data nextcloud_app php occ maintenance:mode --on
