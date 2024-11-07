@@ -30,12 +30,14 @@ services:
       - traefik.http.routers.nextcloud.rule=Host(`nuage.${DOMAIN}`)
       - traefik.http.routers.nextcloud.entrypoints=entrypoints-https       
       - traefik.http.services.nextcloud.loadbalancer.server.port=80
-      
+
+      # - "traefik.http.middlewares.testHeader.headers.customrequestheaders.X-Script-Name=test"
+      - traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011
+    
       # - traefik.http.routers.nextcloud.middlewares=nextcloud,nextcloud_redirect
       # - traefik.http.routers.nextcloud.middlewares=nextcloud
       # - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
       # - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-      # - traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011
       # - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
       # - traefik.http.middlewares.nextcloud.headers.stsPreload=true
       # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
@@ -46,6 +48,7 @@ services:
       - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true
       - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav
       - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav
+
 
   # onlyoffice:
   #   container_name: onlyoffice
@@ -88,8 +91,8 @@ networks:
 # allow to set onlyoffice as local conainer
 # command: sudo -u www-data sh -c "php occ --no-warnings config:system:set allow_local_remote_servers --value=true"
 
-# docker-compose exec --user www-data nextcloud_app php occ db:add-missing-indices
-
+# docker compose exec --user www-data nextcloud_app php occ db:add-missing-indices
+# docker compose exec --user www-data nextcloud_app php occ maintenance:repair --include-expensive
 
 
 # allow to set onlyoffice as local conainer
