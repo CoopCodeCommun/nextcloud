@@ -10,6 +10,14 @@ services:
     networks:            
       - nextcloud_db      
 
+  nextcloud_redis:
+    container_name: nextcloud_redis
+    hostname: nextcloud_redis
+    image: redis:7.4
+    restart: always
+    networks:
+      - nextcloud_db
+
   nextcloud_app:  
     image: nextcloud:30
     restart: always
