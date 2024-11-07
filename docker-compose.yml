@@ -31,14 +31,14 @@ services:
       - traefik.http.routers.nextcloud.entrypoints=entrypoints-https       
       - traefik.http.services.nextcloud.loadbalancer.server.port=80
 
-      # - traefik.http.routers.nextcloud.middlewares=nextcloud,nextcloud_redirect
-      # - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
-      # - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-      # - traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011
-      # - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
-      # - traefik.http.middlewares.nextcloud.headers.stsPreload=true
-      # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
-      # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
+      - traefik.http.routers.nextcloud.middlewares=nextcloud,nextcloud_redirect
+      - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
+      - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+      - traefik.http.middlewares.nextcloud.headers.stsSeconds=155520011
+      - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
+      - traefik.http.middlewares.nextcloud.headers.stsPreload=true
+      - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
+      - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
 
       # Pour traefik 1
       # - traefik.http.middlewares.nextcloud_redirect.redirectregex.regex=/.well-known/(card|cal)dav
