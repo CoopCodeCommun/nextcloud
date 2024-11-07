@@ -1,9 +1,9 @@
 services:
   nextcloud_db:
-    image: postgres:13-bookworm 
-    restart: always                                            
-    container_name: nextcloud_db                                                                                          
-    hostname: nextcloud_db                                                                                                    ports:             
+    image: postgres:13-bookworm
+    hostname: nextcloud_db
+    container_name: nextcloud_db
+    restart: always
     volumes:               
      - ./database:/var/lib/postgresql/data                   
     env_file: .env   
