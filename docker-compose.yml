@@ -39,7 +39,7 @@ services:
       - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
 
       - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex"
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=SAMEORIGIN"
       - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=15552010"
 
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
