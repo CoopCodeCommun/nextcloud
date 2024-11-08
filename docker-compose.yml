@@ -77,7 +77,8 @@ services:
       - traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.${DOMAIN}`)
       
       - traefik.http.routers.onlyoffice.middlewares=onlyoffice
-      - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}
+      - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW
+      # - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}
       - traefik.http.middlewares.onlyoffice.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
       - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
       - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
