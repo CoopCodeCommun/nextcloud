@@ -32,7 +32,8 @@ services:
     networks:
       - nextcloud_db
       - frontend
-
+    links:
+      - onlyoffice:onlyoffice
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
@@ -56,11 +57,11 @@ services:
       # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
 
 
-    extra_hosts:
-      - ${DOMAIN}:172.18.0.1
-      - nuage.${DOMAIN}:172.18.0.1
-      - onlyoffice.${DOMAIN}:172.18.0.1
-      - auth.${DOMAIN}:172.18.0.1
+    # extra_hosts:
+    #   - ${DOMAIN}:172.18.0.1
+    #   - nuage.${DOMAIN}:172.18.0.1
+    #   - onlyoffice.${DOMAIN}:172.18.0.1
+    #   - auth.${DOMAIN}:172.18.0.1
 
   onlyoffice:
     container_name: onlyoffice
@@ -71,6 +72,8 @@ services:
     restart: always
     networks:
       - frontend
+    links:
+      - nextcloud_app:nextcloud_app
     environment:
       JWT_SECRET: ${JWT_SECRET}
     labels:
@@ -96,14 +99,12 @@ services:
   #     # - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
   #     # - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
     
-    extra_hosts:
-      - ${DOMAIN}:172.18.0.1
-      - nuage.${DOMAIN}:172.18.0.1
-      - onlyoffice.${DOMAIN}:172.18.0.1
-      - auth.${DOMAIN}:172.18.0.1
+    # extra_hosts:
+    #   - ${DOMAIN}:172.18.0.1
+    #   - nuage.${DOMAIN}:172.18.0.1
+    #   - onlyoffice.${DOMAIN}:172.18.0.1
+    #   - auth.${DOMAIN}:172.18.0.1
 
-
-  # JWT_SECRET=my_jwt_secret
 
 networks:
   frontend:
