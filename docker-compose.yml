@@ -71,6 +71,8 @@ services:
     restart: always
     networks:
       - frontend
+    environment:
+      - JWT_SECRET: mR2ryZcY9Bho9G5zsOrXj2o39Zw5upRX
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
@@ -100,6 +102,8 @@ services:
       - onlyoffice.${DOMAIN}:172.18.0.1
       - auth.${DOMAIN}:172.18.0.1
 
+
+  # JWT_SECRET=my_jwt_secret
 
 networks:
   frontend:
