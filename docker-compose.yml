@@ -38,6 +38,7 @@ services:
       - traefik.http.routers.nextcloud.rule=Host(`nuage.${DOMAIN}`)
       - traefik.http.routers.nextcloud.entrypoints=entrypoints-https       
       - traefik.http.services.nextcloud.loadbalancer.server.port=80
+      - "traefik.http.services.nextcloud.loadbalancer.passHostHeader=true"
 
       - traefik.http.routers.nextcloud.middlewares=nextcloud
       - traefik.http.middlewares.nextcloud.headers.stsSeconds=15552010
@@ -46,7 +47,9 @@ services:
 
       - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
       - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-      - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
+      # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
+      - "traefik.http.middlewares.nc-header.headers.customFrameOptionsValue=SAMEORIGIN"
+      - "traefik.http.middlewares.nc-header.headers.customResponseHeaders.Strict-Transport-Security=15552000"
       # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
 
       # Pour traefik > v2
