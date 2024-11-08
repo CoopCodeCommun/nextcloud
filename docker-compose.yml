@@ -32,30 +32,28 @@ services:
       - frontend
 
     labels:
-      - traefik.enable=true
-      - traefik.docker.network=frontend
-      - traefik.http.routers.nextcloud.tls.certresolver=myresolver
-      - traefik.http.routers.nextcloud.rule=Host(`nuage.${DOMAIN}`)
-      - traefik.http.routers.nextcloud.entrypoints=entrypoints-https       
-      - traefik.http.services.nextcloud.loadbalancer.server.port=80
-      - traefik.http.services.nextcloud.loadbalancer.passHostHeader=true
+      - "traefik.enable=true"
+      - "traefik.docker.network=frontend"
+      - "traefik.http.routers.nextcloud.tls.certresolver=myresolver"
+      - "traefik.http.routers.nextcloud.rule=Host(`nuage.$DOMAIN`)"
+      - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
 
-      - traefik.http.routers.nextcloud.middlewares=nextcloud
-      - traefik.http.middlewares.nextcloud.headers.stsSeconds=15552010
-      - traefik.http.middlewares.nextcloud.headers.customResponseHeaders.Strict-Transport-Security=15552000
-      - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
-      - traefik.http.middlewares.nextcloud.headers.stsPreload=true
+      - "traefik.http.routers.nextcloud.middlewares=nextcloud"
+      - "traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud.headers.customResponseHeaders.Strict-Transport-Security=15552010"
 
-      - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
-      - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+      # - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
+      # - traefik.http.middlewares.nextcloud.headers.stsPreload=true
+
+      # - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
+      # - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
       # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
       # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
 
-      # Pour traefik > v2
-      - traefik.http.routers.nextcloud.middlewares=nextcloud_redirectregex
-      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true
-      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav
-      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav
+      - "traefik.http.routers.nextcloud.middlewares=nextcloud_redirectregex"
+      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
+      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
+      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
 
     extra_hosts:
       - ${DOMAIN}:172.18.0.1
@@ -63,41 +61,41 @@ services:
       - onlyoffice.${DOMAIN}:172.18.0.1
       - auth.${DOMAIN}:172.18.0.1
 
-  onlyoffice:
-    container_name: onlyoffice
-    hostname: onlyoffice
-    depends_on:
-      - nextcloud_app
-    image: onlyoffice/documentserver:8.2
-    restart: always
-    networks:
-      - frontend
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=frontend
-      - traefik.http.routers.onlyoffice.tls.certresolver=myresolver
-      - traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.${DOMAIN}`)
+  # onlyoffice:
+  #   container_name: onlyoffice
+  #   hostname: onlyoffice
+  #   depends_on:
+  #     - nextcloud_app
+  #   image: onlyoffice/documentserver:8.2
+  #   restart: always
+  #   networks:
+  #     - frontend
+  #   labels:
+  #     - traefik.enable=true
+  #     - traefik.docker.network=frontend
+  #     - traefik.http.routers.onlyoffice.tls.certresolver=myresolver
+  #     - traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.${DOMAIN}`)
       
-      - traefik.http.routers.onlyoffice.middlewares=onlyoffice
-      - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW
-      # - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}
-      - traefik.http.middlewares.onlyoffice.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-      - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
-      - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
-      - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
+  #     - traefik.http.routers.onlyoffice.middlewares=onlyoffice
+  #     - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW
+  #     # - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}
+  #     - traefik.http.middlewares.onlyoffice.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+  #     - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
+  #     - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
+  #     - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
 
 
-  #     ## Extra headers for onlyoffice
-  #     - traefik.http.routers.onlyoffice.tls=true
-  #     - traefik.http.middlewares.cors-headers.headers.accessControlAllowOrigin=*
-      # - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
-      # - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
+  # #     ## Extra headers for onlyoffice
+  # #     - traefik.http.routers.onlyoffice.tls=true
+  # #     - traefik.http.middlewares.cors-headers.headers.accessControlAllowOrigin=*
+  #     # - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
+  #     # - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
     
-    extra_hosts:
-      - ${DOMAIN}:172.18.0.1
-      - nuage.${DOMAIN}:172.18.0.1
-      - onlyoffice.${DOMAIN}:172.18.0.1
-      - auth.${DOMAIN}:172.18.0.1
+  #   extra_hosts:
+  #     - ${DOMAIN}:172.18.0.1
+  #     - nuage.${DOMAIN}:172.18.0.1
+  #     - onlyoffice.${DOMAIN}:172.18.0.1
+  #     - auth.${DOMAIN}:172.18.0.1
 
 
 networks:
