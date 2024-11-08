@@ -72,7 +72,7 @@ services:
     networks:
       - frontend
     environment:
-      - JWT_SECRET: "mR2ryZcY9Bho9G5zsOrXj2o39Zw5upRX"
+      JWT_SECRET: ${JWT_SECRET}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
