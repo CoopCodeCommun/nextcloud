@@ -67,7 +67,7 @@ services:
     hostname: onlyoffice
     depends_on:
       - nextcloud_app
-    image: onlyoffice/documentserver:8.2
+    image: onlyoffice/documentserver:latest
     restart: always
     networks:
       - frontend
