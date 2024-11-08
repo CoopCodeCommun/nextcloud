@@ -51,10 +51,10 @@ services:
       # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
       # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
 
-      - "traefik.http.routers.nextcloud.middlewares=nextcloud_redirectregex"
-      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
-      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
-      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
+      # - "traefik.http.routers.nextcloud.middlewares=nextcloud_redirectregex"
+      # - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
+      # - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
+      # - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
 
     extra_hosts:
       - ${DOMAIN}:172.18.0.1
