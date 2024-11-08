@@ -38,10 +38,13 @@ services:
       - "traefik.http.routers.nextcloud.rule=Host(`nuage.$DOMAIN`)"
       - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
 
-      - "traefik.http.routers.nextcloud.middlewares=custom-header"
-      - "traefik.http.middlewares.custom-header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
-      - "traefik.http.middlewares.custom-header.headers.customResponseHeaders.Strict-Transport-Security=15552010"
-      
+      - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex"
+      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=15552010"
+
+      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
+      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
+      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
 
       # - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
       # - traefik.http.middlewares.nextcloud.headers.stsPreload=true
@@ -51,10 +54,6 @@ services:
       # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
       # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
 
-      # - "traefik.http.routers.nextcloud.middlewares=nextcloud_redirectregex"
-      # - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
-      # - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
-      # - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
 
     extra_hosts:
       - ${DOMAIN}:172.18.0.1
