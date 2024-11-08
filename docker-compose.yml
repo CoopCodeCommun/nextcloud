@@ -66,8 +66,8 @@ services:
   onlyoffice:
     container_name: onlyoffice
     hostname: onlyoffice
-    depends_on:
-      - nextcloud_app
+    # depends_on:
+      # - nextcloud_app
     image: onlyoffice/documentserver:latest
     restart: always
     networks:
