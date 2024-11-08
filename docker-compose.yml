@@ -78,8 +78,8 @@ services:
       - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains"
-      
-  #     - traefik.http.middlewares.onlyoffice.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+      - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}"
+
   #     - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
   #     - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
   #     - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
