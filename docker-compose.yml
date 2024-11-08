@@ -44,8 +44,8 @@ services:
       - traefik.http.middlewares.nextcloud.headers.stsIncludeSubdomains=true
       - traefik.http.middlewares.nextcloud.headers.stsPreload=true
 
-      # - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
-      # - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+      - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
+      - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
       # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
       # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
 
