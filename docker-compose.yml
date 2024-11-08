@@ -87,8 +87,8 @@ services:
   #     ## Extra headers for onlyoffice
   #     - traefik.http.routers.onlyoffice.tls=true
   #     - traefik.http.middlewares.cors-headers.headers.accessControlAllowOrigin=*
-      - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
-      - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
+      # - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
+      # - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
     
     extra_hosts:
       - ${DOMAIN}:172.18.0.1
