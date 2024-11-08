@@ -44,6 +44,10 @@ Aller chercher le token
 allow to set onlyoffice as local container (a checker si tjrs necessaire dans v30?)
 `docker compose exec --user www-data nextcloud_app php occ --no-warnings config:system:set allow_local_remote_servers --value=true`
 
+Attention : dans parametre avancé du serveur, ajouter: 
+- Adresse du ONLYOFFICE Docs pour les demandes internes du serveur : http://onlyoffice/ 
+- Adresse du serveur pour les demandes internes du ONLYOFFICE Docs : http://nextcloud_app/
+
 ### Pour libresign :
 
 `docker compose exec --user www-data nextcloud_app php occ libresign:install --java`

@@ -48,18 +48,6 @@ services:
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
 
-      # - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
-      # - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-      # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
-      # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
-
-
-    # extra_hosts:
-    #   - ${DOMAIN}:172.18.0.1
-    #   - nuage.${DOMAIN}:172.18.0.1
-    #   - onlyoffice.${DOMAIN}:172.18.0.1
-    #   - auth.${DOMAIN}:172.18.0.1
-
   onlyoffice:
     container_name: onlyoffice
     hostname: onlyoffice
@@ -81,24 +69,6 @@ services:
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}"
 
-  #     - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
-  #     - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
-  #     - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
-
-
-  # #     ## Extra headers for onlyoffice
-  # #     - traefik.http.routers.onlyoffice.tls=true
-  # #     - traefik.http.middlewares.cors-headers.headers.accessControlAllowOrigin=*
-  #     # - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
-  #     # - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
-    
-    # extra_hosts:
-    #   - ${DOMAIN}:172.18.0.1
-    #   - nuage.${DOMAIN}:172.18.0.1
-    #   - onlyoffice.${DOMAIN}:172.18.0.1
-    #   - auth.${DOMAIN}:172.18.0.1
-
-
 networks:
   frontend:
     external: true
@@ -107,15 +77,4 @@ networks:
 
 
 
-# allow to set onlyoffice as local conainer
-# command: sudo -u www-data sh -c "php occ --no-warnings config:system:set allow_local_remote_servers --value=true"
 
-# Exemple pour reconstruire les index après une maj :
-# docker compose exec --user www-data nextcloud_app php occ db:add-missing-indices
-
-# Scanner les fichier sur disque dur et reconstruire la base de donnée ( utilse en cas de suppression de fichier depuis le terminal ) 
-# docker compose exec --user www-data nextcloud_app php occ files:scan jonas
-# docker compose exec --user www-data nextcloud_app php occ files:scan --path="Ekopratik/files/Ekopratik/2. Administration/2.2 Salariat/2.2.1 En cours/"
-# docker compose exec --user www-data nextcloud_app php occ trashbin:cleanup Ekopratik
-
-# docker compose exec --user www-data nextcloud_app php occ maintenance:mode --on
