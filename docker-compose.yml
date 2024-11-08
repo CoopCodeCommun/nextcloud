@@ -56,28 +56,27 @@ services:
       - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav
 
 
-  # onlyoffice:
-  #   container_name: onlyoffice
-  #   hostname: onlyoffice
-  #   depends_on:
-  #     - nextcloud_app
-  #   image: onlyoffice/documentserver:8.2
-  #   restart: always
-  #   networks:
-  #     - frontend
-  #   labels:
-  #     - traefik.enable=true
-  #     - traefik.docker.network=frontend
-
-  #     - traefik.http.routers.onlyoffice.middlewares=onlyoffice
-  #     - traefik.http.routers.onlyoffice.tls.certresolver=myresolver
-  #     - traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.${DOMAIN}`)
+  onlyoffice:
+    container_name: onlyoffice
+    hostname: onlyoffice
+    depends_on:
+      - nextcloud_app
+    image: onlyoffice/documentserver:8.2
+    restart: always
+    networks:
+      - frontend
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=frontend
+      - traefik.http.routers.onlyoffice.tls.certresolver=myresolver
+      - traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.${DOMAIN}`)
       
-  #     - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}
-  #     - traefik.http.middlewares.onlyoffice.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-  #     - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
-  #     - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
-  #     - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
+      # - traefik.http.routers.onlyoffice.middlewares=onlyoffice
+      # - traefik.http.middlewares.onlyoffice.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}
+      # - traefik.http.middlewares.onlyoffice.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
+      # - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
+      # - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
+      # - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
 
 
   #     ## Extra headers for onlyoffice
@@ -93,12 +92,6 @@ networks:
   nextcloud_db:
     internal: true
 
-
-# allow to set onlyoffice as local conainer
-# command: sudo -u www-data sh -c "php occ --no-warnings config:system:set allow_local_remote_servers --value=true"
-
-# docker compose exec --user www-data nextcloud_app php occ db:add-missing-indices
-# docker compose exec --user www-data nextcloud_app php occ maintenance:repair --include-expensive
 
 
 # allow to set onlyoffice as local conainer
