@@ -39,8 +39,10 @@ ex avec le domaine nuage.mondns.fr
 ### Pour Onlyoffice :
 
 Aller chercher le token
-
 `docker compose exec onlyoffice /var/www/onlyoffice/documentserver/npm/json -f /etc/onlyoffice/documentserver/local.json 'services.CoAuthoring.secret.session.string'`
+
+allow to set onlyoffice as local container (a checker si tjrs necessaire dans v30?)
+`docker compose exec --user www-data nextcloud_app php occ --no-warnings config:system:set allow_local_remote_servers --value=true`
 
 ### Pour libresign :
 
@@ -48,8 +50,6 @@ Aller chercher le token
 `docker compose exec --user www-data nextcloud_app php occ libresign:install --pdftk`
 `docker compose exec --user www-data nextcloud_app php occ libresign:install --jsignpdf`
 
-### allow to set onlyoffice as local container (a checker si tjrs necessaire dans v30?)
-`command: sudo -u www-data sh -c "php occ --no-warnings config:system:set allow_local_remote_servers --value=true"`
 
 ## Bug fixes
 
