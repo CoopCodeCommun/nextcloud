@@ -41,7 +41,7 @@ services:
 
       - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex"
 
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW"
       - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains"
       - "traefik.http.middlewares.nextcloud_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} onlyoffice.${DOMAIN}"
 
@@ -80,7 +80,7 @@ services:
       - "traefik.http.services.onlyoffice.loadbalancer.server.port=80"
       
       - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} nuage.${DOMAIN}"
 
