@@ -83,12 +83,13 @@ services:
       - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
       - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
 
+
   #     ## Extra headers for onlyoffice
-      - traefik.http.middlewares.cors-headers.headers.accessControlAllowOrigin=*
+  #     - traefik.http.routers.onlyoffice.tls=true
+  #     - traefik.http.middlewares.cors-headers.headers.accessControlAllowOrigin=*
       - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
       - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
-  #     - traefik.http.routers.onlyoffice.tls=true
-
+    
     extra_hosts:
       - ${DOMAIN}:172.18.0.1
       - nuage.${DOMAIN}:172.18.0.1
