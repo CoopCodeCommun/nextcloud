@@ -36,7 +36,14 @@ ex avec le domaine nuage.mondns.fr
 `docker compose exec --user www-data nextcloud_app php occ config:system:set maintenance_window_start --type=integer --value=1`
 `docker compose exec --user www-data nextcloud_app php occ config:system:set default_phone_region --value=“FR”`
 
+### Pour Onlyoffice :
+
+Aller chercher le token
+
+`docker compose exec onlyoffice /var/www/onlyoffice/documentserver/npm/json -f /etc/onlyoffice/documentserver/local.json 'services.CoAuthoring.secret.session.string'`
+
 ### Pour libresign :
+
 `docker compose exec --user www-data nextcloud_app php occ libresign:install --java`
 `docker compose exec --user www-data nextcloud_app php occ libresign:install --pdftk`
 `docker compose exec --user www-data nextcloud_app php occ libresign:install --jsignpdf`
