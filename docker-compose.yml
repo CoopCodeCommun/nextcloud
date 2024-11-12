@@ -41,9 +41,9 @@ services:
 
       - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex"
 
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW"
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains"
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} onlyoffice.${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
+      # - "traefik.http.middlewares.nextcloud_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} onlyoffice.${DOMAIN}"
 
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
@@ -68,10 +68,11 @@ services:
     restart: always
     networks:
       - frontend
-    links:
-      - nextcloud_app:nextcloud_app
     environment:
       JWT_SECRET: ${JWT_SECRET}
+    expose:
+      - '80'
+      - '443'
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
@@ -79,15 +80,10 @@ services:
       - "traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.$DOMAIN`)"
       - "traefik.http.services.onlyoffice.loadbalancer.server.port=80"
       
-      - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} nuage.${DOMAIN}"
-
-  #     - traefik.http.middlewares.onlyoffice.headers.stsSeconds=155520011
-  #     - traefik.http.middlewares.onlyoffice.headers.stsIncludeSubdomains=true
-  #     - traefik.http.middlewares.onlyoffice.headers.stsPreload=true
-
+      # - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
+      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;" #https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security#an_example_scenario
+      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} nuage.${DOMAIN}"
 
   # #     ## Extra headers for onlyoffice
   # #     - traefik.http.routers.onlyoffice.tls=true
