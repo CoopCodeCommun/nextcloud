@@ -41,9 +41,9 @@ services:
 
       - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex"
 
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM http://${DOMAIN}"
       - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
-      # - "traefik.http.middlewares.nextcloud_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} onlyoffice.${DOMAIN}"
+      - "traefik.http.middlewares.nextcloud_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} onlyoffice.${DOMAIN}"
 
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
