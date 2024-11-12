@@ -54,7 +54,6 @@ services:
       # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
       # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
 
-
     # extra_hosts:
     #   - ${DOMAIN}:172.18.0.1
     #   - nuage.${DOMAIN}:172.18.0.1
