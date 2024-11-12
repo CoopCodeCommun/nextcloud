@@ -85,10 +85,10 @@ services:
       - "traefik.http.routers.onlyoffice.middlewares=onlyoffice-https-redirect"
       - "traefik.http.middlewares.onlyoffice-https-redirect.redirectscheme.scheme=https"
 
-      - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://onlyoffice.lamiete.fr; frame-ancestors 'self' https://${DOMAIN} onlyoffice.${DOMAIN} *.${DOMAIN};"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains;  preload;"
+      # - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
+      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://onlyoffice.lamiete.fr; frame-ancestors 'self' https://${DOMAIN} onlyoffice.${DOMAIN} *.${DOMAIN};"
+      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
+      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains;  preload;"
 
       # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
       # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;" #https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security#an_example_scenario
