@@ -41,10 +41,11 @@ services:
 
       - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex"
 
-      # - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM http://${DOMAIN} https://${DOMAIN} ${DOMAIN} http://onlyoffice.${DOMAIN} https://onlyoffice.${DOMAIN}"
+        # Pour le chargement de scripts extérieurs, ex : onlyoffice
       - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
       - "traefik.http.middlewares.nextcloud_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} onlyoffice.${DOMAIN} "
 
+        # redirection nécéssaire au desktop client et autres webdav
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
@@ -75,7 +76,6 @@ services:
 
       - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
-
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.referrerPolicy=no-referrer"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.forceSTSHeader=true"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.browserXssFilter=true"
