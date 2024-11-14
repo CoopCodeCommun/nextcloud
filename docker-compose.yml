@@ -41,7 +41,7 @@ services:
 
       - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex"
 
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM http://${DOMAIN} https://${DOMAIN} ${DOMAIN} http://onlyoffice.${DOMAIN} https://onlyoffice.${DOMAIN}"
+      # - "traefik.http.middlewares.nextcloud_custom_header.headers.customFrameOptionsValue=ALLOW-FROM http://${DOMAIN} https://${DOMAIN} ${DOMAIN} http://onlyoffice.${DOMAIN} https://onlyoffice.${DOMAIN}"
       - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
       - "traefik.http.middlewares.nextcloud_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} onlyoffice.${DOMAIN} "
 
