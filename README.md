@@ -1,4 +1,4 @@
-# nextcloud 30 + onlyoffce 8.2 + Traefik v3 + Keycloak
+# Docker compose : Nextcloud 30 (hub 9) + Onlyoffice 8.2 + Traefik v3 + Redis 7
 
 Installation nextcloud derrière Traefik v3 via docker compose
 

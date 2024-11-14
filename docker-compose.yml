@@ -87,17 +87,3 @@ networks:
     external: true
   nextcloud_db:
     internal: true
-
-
-# allow to set onlyoffice as local container
-# command: sudo -u www-data sh -c "php occ --no-warnings config:system:set allow_local_remote_servers --value=true"
-
-# Exemple pour reconstruire les index après une maj :
-# docker compose exec --user www-data nextcloud_app php occ db:add-missing-indices
-
-# Scanner les fichier sur disque dur et reconstruire la base de donnée ( utilse en cas de suppression de fichier depuis le terminal ) 
-# docker compose exec --user www-data nextcloud_app php occ files:scan jonas
-# docker compose exec --user www-data nextcloud_app php occ files:scan --path="Ekopratik/files/Ekopratik/2. Administration/2.2 Salariat/2.2.1 En cours/"
-# docker compose exec --user www-data nextcloud_app php occ trashbin:cleanup Ekopratik
-
-# docker compose exec --user www-data nextcloud_app php occ maintenance:mode --on
