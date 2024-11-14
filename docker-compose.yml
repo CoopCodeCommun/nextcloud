@@ -49,17 +49,6 @@ services:
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
 
-      # - traefik.http.middlewares.nextcloud.headers.customFrameOptionsValue=ALLOW
-      # - traefik.http.middlewares.nextcloud.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN}
-      # - traefik.http.middlewares.nextcloud.headers.customresponseheaders.X-Frame-Options=SAMEORIGIN
-      # - traefik.http.middlewares.nextcloud.headers.accesscontrolalloworigin=*
-
-    # extra_hosts:
-    #   - ${DOMAIN}:172.18.0.1
-    #   - nuage.${DOMAIN}:172.18.0.1
-    #   - onlyoffice.${DOMAIN}:172.18.0.1
-    #   - auth.${DOMAIN}:172.18.0.1
-
   onlyoffice:
     container_name: onlyoffice
     hostname: onlyoffice
@@ -85,34 +74,13 @@ services:
       - "traefik.http.middlewares.onlyoffice-https-redirect.redirectscheme.scheme=https"
 
       - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
+      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
+
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.referrerPolicy=no-referrer"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.stsSeconds=15552000"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.stsPreload=true"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.stsIncludeSubdomains=true"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.browserXssFilter=true"
       - "traefik.http.middlewares.onlyoffice_custom_header.headers.customRequestHeaders.X-Forwarded-Proto=https"
       
-      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://onlyoffice.lamiete.fr; frame-ancestors 'self' https://${DOMAIN} onlyoffice.${DOMAIN} *.${DOMAIN};"
-      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
-      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains;  preload;"
-
-      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customFrameOptionsValue=ALLOW-FROM https://${DOMAIN}"
-      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;" #https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security#an_example_scenario
-      # - "traefik.http.middlewares.onlyoffice_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} *.${DOMAIN} nuage.${DOMAIN}"
-
-  # #     ## Extra headers for onlyoffice
-  # #     - traefik.http.routers.onlyoffice.tls=true
-  # #     - traefik.http.middlewares.cors-headers.headers.accessControlAllowOrigin=*
-  #     # - traefik.http.middlewares.onlyoffice.headers.customRequestHeaders.X-Forwarded-Proto=https
-  #     # - traefik.http.middlewares.onlyoffice.headers.accesscontrolalloworigin=*
-    
-    # extra_hosts:
-    #   - ${DOMAIN}:172.18.0.1
-    #   - nuage.${DOMAIN}:172.18.0.1
-    #   - onlyoffice.${DOMAIN}:172.18.0.1
-    #   - auth.${DOMAIN}:172.18.0.1
-
 
 networks:
   frontend:
@@ -121,8 +89,7 @@ networks:
     internal: true
 
 
-
-# allow to set onlyoffice as local conainer
+# allow to set onlyoffice as local container
 # command: sudo -u www-data sh -c "php occ --no-warnings config:system:set allow_local_remote_servers --value=true"
 
 # Exemple pour reconstruire les index après une maj :
