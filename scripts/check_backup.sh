@@ -17,7 +17,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 STACK_DIR="${STACK_DIR:-$(dirname "$SCRIPT_DIR")}"
-COMPOSE_FILE="$STACK_DIR/docker-compose.yml"
+. "$SCRIPT_DIR/commun.sh"   # compose() : + override s'il existe
 ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
 
 ok()     { echo "  [ok]   $*"; }
@@ -111,14 +111,14 @@ echo
 echo "3. Le dump est-il restaurable ?"
 if [ -z "$CHEMIN_DUMP" ]; then
   ko "pas de dump a verifier."
-elif ! docker compose -f "$COMPOSE_FILE" ps -q "$DB_SERVICE" | grep -q .; then
+elif ! compose ps -q "$DB_SERVICE" | grep -q .; then
   ko "conteneur $DB_SERVICE arrete : impossible de valider le dump avec pg_restore."
 else
   # pipefail coupe le temps du tuyau : si pg_restore s'arrete tot, borg prend
   # un SIGPIPE (141), ce n'est pas lui qu'on juge.
   set +o pipefail
   if borg extract --stdout "$BORG_REPO::$ARCHIVE" "$CHEMIN_DUMP" 2>/dev/null \
-      | docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" pg_restore -f /dev/null 2>/dev/null; then
+      | compose exec -T "$DB_SERVICE" pg_restore -f /dev/null 2>/dev/null; then
     ok "dump complet et lisible par pg_restore"
   else
     ko "dump ILLISIBLE ou TRONQUE : cette sauvegarde n'est pas restaurable."

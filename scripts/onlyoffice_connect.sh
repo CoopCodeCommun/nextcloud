@@ -19,12 +19,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 STACK_DIR="$(dirname "$SCRIPT_DIR")"
-COMPOSE_FILE="$STACK_DIR/docker-compose.yml"
+. "$SCRIPT_DIR/commun.sh"   # compose(), valeur_env()
 APP_SERVICE="${APP_SERVICE:-nextcloud_app}"
 OO_SERVICE="${OO_SERVICE:-onlyoffice}"
 
 # On ne charge du .env de la stack que ce dont on a besoin.
-valeur_env() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$STACK_DIR/.env" | tail -n1 | tr -d "'\""; }
 DOMAIN="$(valeur_env DOMAIN)"
 JWT_SECRET="$(valeur_env JWT_SECRET)"
 [ -n "$DOMAIN" ]     || { echo "[onlyoffice] DOMAIN absent du .env" >&2; exit 1; }
@@ -35,7 +34,6 @@ JWT_HEADER="${JWT_HEADER:-Authorization}"
 DS_URL="https://onlyoffice.$DOMAIN/"
 NC_URL="https://nuage.$DOMAIN/"
 
-compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
 occ()     { compose exec -T -u www-data "$APP_SERVICE" php occ --no-warnings "$@"; }
 
 

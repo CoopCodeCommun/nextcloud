@@ -4,6 +4,9 @@
 scripts/.env
 scripts/.ssh/
 
+# Reglages propres a un serveur (extra_hosts...)
+docker-compose.override.yml
+
 # Donnees (sauvegardees par borg, pas par git)
 data/
 database/

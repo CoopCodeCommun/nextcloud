@@ -4,8 +4,8 @@ set -euo pipefail
 ##### INSTRUCTION
 #
 # Montee de version majeure de PostgreSQL pour la stack Nextcloud
-# (faite en 13 -> 18 le 8 nov. 2026 ; PG_CIBLE=19 make pg-upgrade pour la suite).
-# Lance par :  make pg-upgrade   (en root : le Makefile ajoute sudo)
+# (faite en 13 -> 18 le 8 nov. 2026).
+# Lance par :  make pg-upgrade PG_CIBLE=19   (en root : le Makefile ajoute sudo)
 #
 # Methode : dump / restauration (la plus sure entre deux majeures eloignees).
 #   1. sauvegarde borg complete (make backup)
@@ -14,8 +14,10 @@ set -euo pipefail
 #      chaque table
 #   4. l'ancien dossier database/ est DEPLACE (pas supprime) en
 #      database.pgXX/ : retour arriere possible
-#   5. docker-compose.yml : nouvelle image (+ nouveau point de montage en
-#      passant a PG 18+, qui range ses donnees dans /var/lib/postgresql/18/docker)
+#   5. .env : POSTGRES_TAG=<cible> (+ retrait de POSTGRES_MOUNT en passant a
+#      PG 18+, qui range ses donnees dans /var/lib/postgresql/18/docker).
+#      C'est le SEUL moyen prevu de changer POSTGRES_TAG : make up / update
+#      refusent un tag different de la version des donnees.
 #   6. nouvelle base vide, restauration, puis :
 #      - mots de passe re-haches en scram-sha-256 (le md5 de PG 13 serait
 #        refuse par le pg_hba de l'image 18)
@@ -29,16 +31,13 @@ set -euo pipefail
 #   sudo rm -r database.pgXX scripts/pg-upgrade
 #####
 
-PG_CIBLE="${PG_CIBLE:-18}"
+PG_CIBLE="${PG_CIBLE:-}"
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-STACK_DIR="$(dirname "$SCRIPT_DIR")"
-COMPOSE_FILE="$STACK_DIR/docker-compose.yml"
+. "$(dirname -- "$0")/commun.sh"
 DB_SERVICE="nextcloud_db"
 APP_SERVICE="nextcloud_app"
 WORK_DIR="$SCRIPT_DIR/pg-upgrade"
 
-compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
 occ()     { compose exec -T -u www-data "$APP_SERVICE" php occ --no-warnings "$@"; }
 etape()   { echo; echo "[pg-upgrade] ===== $* ====="; }
 psql_db() { compose exec -T "$DB_SERVICE" sh -c 'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'; }
@@ -48,8 +47,11 @@ SQL_COMPTAGE="select table_name || ' ' || (xpath('/row/c/text()', query_to_xml(f
 from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by 1;"
 
 [ "$(id -u)" -eq 0 ] || { echo "[pg-upgrade] a lancer en root (make pg-upgrade ajoute sudo)." >&2; exit 1; }
+[ -n "$PG_CIBLE" ] || { echo "[pg-upgrade] preciser la cible : make pg-upgrade PG_CIBLE=19" >&2; exit 1; }
+# Etat de depart coherent : POSTGRES_TAG = version des donnees.
+verifier_postgres || exit 1
 
-IMAGE_ACTUELLE="$(sed -n "/^  $DB_SERVICE:/,/^  [a-z_]*:\$/s/^ *image: *//p" "$COMPOSE_FILE" | head -1)"
+IMAGE_ACTUELLE="postgres:$(valeur_env POSTGRES_TAG)-bookworm"
 VERSION_ACTUELLE="$(compose exec -T "$DB_SERVICE" sh -c 'cat "$PGDATA/PG_VERSION"')"
 IMAGE_CIBLE="postgres:${PG_CIBLE}-bookworm"
 OLD_DIR="$STACK_DIR/database.pg$VERSION_ACTUELLE"
@@ -57,20 +59,18 @@ echo "[pg-upgrade] actuel : $IMAGE_ACTUELLE (donnees PG $VERSION_ACTUELLE) -> ci
 
 [ "$VERSION_ACTUELLE" -lt "$PG_CIBLE" ] || { echo "[pg-upgrade] deja en PG $VERSION_ACTUELLE : rien a faire."; exit 0; }
 [ ! -e "$OLD_DIR" ] || { echo "[pg-upgrade] $OLD_DIR existe deja (tentative precedente ?) : a examiner avant de relancer." >&2; exit 1; }
-# Deux dispositions possibles du volume :
-#   ancienne (PG <= 17) : ./database:/var/lib/postgresql/data
-#   nouvelle (PG >= 18) : ./database:/var/lib/postgresql   (donnees dans 18/docker)
-if grep -qE '^ +- ./database:/var/lib/postgresql/data *$' "$COMPOSE_FILE"; then
-  MONTAGE_ANCIEN=1
-elif grep -qE '^ +- ./database:/var/lib/postgresql *$' "$COMPOSE_FILE"; then
-  MONTAGE_ANCIEN=0
-else
-  echo "[pg-upgrade] montage ./database:/var/lib/postgresql[/data] introuvable dans le compose." >&2; exit 1
-fi
+# Deux dispositions possibles du volume (POSTGRES_MOUNT du .env) :
+#   ancienne (PG <= 17) : POSTGRES_MOUNT=/var/lib/postgresql/data
+#   nouvelle (PG >= 18) : pas de POSTGRES_MOUNT (/var/lib/postgresql, donnees dans 18/docker)
+case "$(valeur_env POSTGRES_MOUNT)" in
+  /var/lib/postgresql/data)    MONTAGE_ANCIEN=1 ;;
+  ""|/var/lib/postgresql)      MONTAGE_ANCIEN=0 ;;
+  *) echo "[pg-upgrade] POSTGRES_MOUNT inattendu : $(valeur_env POSTGRES_MOUNT)" >&2; exit 1 ;;
+esac
 [ "$MONTAGE_ANCIEN" = 1 ] || [ "$PG_CIBLE" -ge 18 ] \
   || { echo "[pg-upgrade] disposition PG 18+ deja en place : cible $PG_CIBLE impossible." >&2; exit 1; }
 
-docker pull -q "$IMAGE_CIBLE" >/dev/null
+docker pull -q "$IMAGE_CIBLE" >/dev/null || { echo "[pg-upgrade] image $IMAGE_CIBLE introuvable sur Docker Hub." >&2; exit 1; }
 
 
 #### 1. SAUVEGARDE ####
@@ -106,14 +106,15 @@ echo "[pg-upgrade] dump : $(du -h "$WORK_DIR/base.dump" | cut -f1), $(wc -l < "$
 #### 4. ANCIENNE BASE MISE DE COTE ####
 etape "4/8 arret de PG $VERSION_ACTUELLE, database/ -> $(basename "$OLD_DIR")/"
 compose stop "$DB_SERVICE"
-cp -a "$COMPOSE_FILE" "$WORK_DIR/docker-compose.yml.pg$VERSION_ACTUELLE"
+cp -a "$STACK_ENV" "$WORK_DIR/env.pg$VERSION_ACTUELLE"
 mv "$STACK_DIR/database" "$OLD_DIR"
 
 retour_arriere() {
   echo "[pg-upgrade] ECHEC : retour a PG $VERSION_ACTUELLE." >&2
   compose stop "$DB_SERVICE" || true
   compose rm -f "$DB_SERVICE" || true
-  cp -a "$WORK_DIR/docker-compose.yml.pg$VERSION_ACTUELLE" "$COMPOSE_FILE"
+  # cat > : le .env garde son proprietaire et ses droits
+  cat "$WORK_DIR/env.pg$VERSION_ACTUELLE" > "$STACK_ENV"
   [ -d "$STACK_DIR/database" ] && mv "$STACK_DIR/database" "$STACK_DIR/database.echec-pg$PG_CIBLE-$(date +%s)"
   mv "$OLD_DIR" "$STACK_DIR/database"
   compose up -d "$DB_SERVICE" "$APP_SERVICE"
@@ -124,21 +125,22 @@ retour_arriere() {
 trap retour_arriere EXIT
 
 
-#### 5. COMPOSE ####
-etape "5/8 docker-compose.yml : $IMAGE_CIBLE"
-sed -i -e "/^  $DB_SERVICE:/,/^  [a-z_]*:\$/s#^\( *image: *\).*#\1$IMAGE_CIBLE#" "$COMPOSE_FILE"
+#### 5. .ENV ####
+etape "5/8 .env : POSTGRES_TAG=$PG_CIBLE"
+ecrire_env POSTGRES_TAG "$PG_CIBLE"
 # Passage a la disposition PG 18+ seulement si la cible l'exige.
 if [ "$MONTAGE_ANCIEN" = 1 ] && [ "$PG_CIBLE" -ge 18 ]; then
-  sed -i -e 's#^\( *- ./database:/var/lib/postgresql\)/data *$#\1#' "$COMPOSE_FILE"
-  MONTAGE_ATTENDU='./database:/var/lib/postgresql *$'
+  supprimer_env POSTGRES_MOUNT
+  MONTAGE_ATTENDU=/var/lib/postgresql
 elif [ "$MONTAGE_ANCIEN" = 1 ]; then
-  MONTAGE_ATTENDU='./database:/var/lib/postgresql/data *$'
+  MONTAGE_ATTENDU=/var/lib/postgresql/data
 else
-  MONTAGE_ATTENDU='./database:/var/lib/postgresql *$'
+  MONTAGE_ATTENDU=/var/lib/postgresql
 fi
 compose config -q
-grep -qE "image: $IMAGE_CIBLE\$" "$COMPOSE_FILE" && grep -qE "$MONTAGE_ATTENDU" "$COMPOSE_FILE" \
-  || { echo "[pg-upgrade] edition du compose inattendue" >&2; exit 1; }
+compose config --images | grep -qx "$IMAGE_CIBLE" \
+  && compose config | grep -qE "^ *target: $MONTAGE_ATTENDU\$" \
+  || { echo "[pg-upgrade] edition du .env inattendue (image ou montage)" >&2; exit 1; }
 
 
 #### 6. NOUVELLE BASE + RESTAURATION ####

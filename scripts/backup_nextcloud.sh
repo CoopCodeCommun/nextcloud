@@ -81,7 +81,8 @@ done
 [ -f "$COMPOSE_FILE" ] || { echo "[nc-borg] compose introuvable : $COMPOSE_FILE" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || echo "[nc-borg] [WARN] pas root : data/ (www-data) sera illisible." >&2
 
-compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
+# compose() : + docker-compose.override.yml s'il existe
+. "$SCRIPT_DIR/commun.sh"
 occ()     { compose exec -T -u www-data "$APP_SERVICE" php occ "$@"; }
 
 DATE_NOW=$(date +%Y-%m-%d-%H-%M)

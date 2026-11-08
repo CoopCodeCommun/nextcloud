@@ -6,33 +6,35 @@ set -euo pipefail
 # Mise a jour de la stack Nextcloud + OnlyOffice, avec sauvegarde prealable.
 # Lance par :  make update   (en root : le Makefile ajoute sudo)
 #
+#   0. pull des images + GARDE-FOUS (scripts/commun.sh) : on refuse AVANT de
+#      toucher a quoi que ce soit si une version ne colle pas
 #   1. sauvegarde borg coherente (mode maintenance + pg_dump + fichiers)
 #   2. mise a jour des apps sur la version ACTUELLE (avant le saut de version)
 #   3. OnlyOffice : deconnexion propre des editeurs (prepare4shutdown), sinon
 #      les documents ouverts peuvent perdre leurs dernieres modifications
-#   4. pull + up -d : l'image Nextcloud joue elle-meme `occ upgrade` au
-#      demarrage quand la version change
+#   4. up -d : l'image Nextcloud joue elle-meme `occ upgrade` au demarrage
+#      quand la version change
 #   5. attente de la fin de la montee de version
 #   6. finitions : index/colonnes manquants, mise a jour des apps
 #   7. reconnexion OnlyOffice depuis le .env, et verification
 #
-# La version cible est celle du tag dans docker-compose.yml (nextcloud:33) :
-# `make update` suit les correctifs de la 33 ; pour passer en 34, on change le
-# tag a la main. Nextcloud n'accepte qu'UNE version majeure a la fois.
+# Les versions sont celles du .env (NEXTCLOUD_TAG=33...) : `make update` suit
+# les CORRECTIFS, il ne change jamais de majeure. Il refuse :
+#   - une majeure Nextcloud differente de l'installee (-> make upgrade, qui
+#     le relance avec SAUT_MAJEUR=1 pour exactement +1)
+#   - un POSTGRES_TAG different de la version des donnees (-> make pg-upgrade)
+#   - un ONLYOFFICE_TAG change, sauf OO_CONFIRME=1
 #
 #   ./update_nextcloud.sh              # sauvegarde puis mise a jour
 #   ./update_nextcloud.sh --no-backup  # sans sauvegarde (a eviter)
 #####
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
-STACK_DIR="$(dirname "$SCRIPT_DIR")"
-COMPOSE_FILE="$STACK_DIR/docker-compose.yml"
+. "$(dirname -- "$0")/commun.sh"
 APP_SERVICE="nextcloud_app"
 OO_SERVICE="onlyoffice"
 # Une montee majeure avec beaucoup de fichiers peut etre longue.
 TIMEOUT="${TIMEOUT:-1800}"
 
-compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
 occ()     { compose exec -T -u www-data "$APP_SERVICE" php occ --no-warnings "$@"; }
 etape()   { echo; echo "[nc-update] ===== $* ====="; }
 version() { occ status --output=json 2>/dev/null | sed -n 's/.*"versionstring":"\([^"]*\)".*/\1/p'; }
@@ -42,6 +44,14 @@ version() { occ status --output=json 2>/dev/null | sed -n 's/.*"versionstring":"
 
 VERSION_AVANT="$(version || true)"
 echo "[nc-update] version actuelle : ${VERSION_AVANT:-inconnue}"
+
+
+#### 0. IMAGES + GARDE-FOUS ####
+etape "0/7 images + verification des versions"
+# Le pull ne touche a aucun conteneur : on peut lire la version des nouvelles
+# images et refuser avant la sauvegarde et la coupure.
+compose pull
+verifier_versions || { echo "[nc-update] ABANDON : rien n'a ete modifie." >&2; exit 1; }
 
 
 #### 1. SAUVEGARDE ####
@@ -71,8 +81,7 @@ fi
 
 
 #### 4. NOUVELLES IMAGES ####
-etape "4/7 pull + redemarrage"
-compose pull
+etape "4/7 redemarrage sur les nouvelles images"
 compose up -d
 # Image OnlyOffice inchangee => conteneur non recree => toujours en mode
 # arret : on le redemarre nous-memes.

@@ -171,6 +171,38 @@ Non repris : `compose-onlyoffice.yml` (OnlyOffice avec PostgreSQL 12 et RabbitMQ
 
 Appliqué : `prepare4shutdown`, `docker compose up -d` (~1 min de coupure). Vérifié : site 200, OnlyOffice « 10.0.0.169 is successfully connected », redirection CalDAV, HSTS, port 8090 fermé, `cron.php` OK.
 
+### Versions dans le `.env` et garde-fous (8 nov.)
+
+Pour qu'un seul dépôt serve plusieurs instances à des versions différentes (codecommun en 32, lamiete en 33), les tags d'images sortent du compose :
+
+- **`docker-compose.yml`** : `nextcloud:${NEXTCLOUD_TAG}`, `postgres:${POSTGRES_TAG}-bookworm`, `onlyoffice/documentserver:${ONLYOFFICE_TAG}`, montage `./database:${POSTGRES_MOUNT:-/var/lib/postgresql}` (`POSTGRES_MOUNT=/var/lib/postgresql/data` pour une base ≤ 17). Le compose est identique sur tous les serveurs.
+- **`.env`** de lamiete : `NEXTCLOUD_TAG=33`, `POSTGRES_TAG=18`, `ONLYOFFICE_TAG=10.0`. Images résolues identiques à avant : aucun conteneur recréé.
+- **`docker-compose.override.yml`** (local, ignoré par git) pour ce qui est propre à un serveur (`extra_hosts`…). Les scripts le chargent aussi : `docker compose -f docker-compose.yml` l'ignorait.
+
+Le problème à éviter, composant par composant :
+
+| Si on change le tag à la main | Ce qui se passait | Garde-fou |
+|---|---|---|
+| Nextcloud +2 majeures | l'image refuse de démarrer, site coupé | refus avant tout arrêt |
+| Nextcloud +1 majeure | montée sans vérifier les apps (désactivées) ni la maturité | refus : passer par `make upgrade` |
+| PostgreSQL 18 → 19 | l'image 19 crée une base **vide** dans `database/19/docker`, Nextcloud se connecte dessus | refus : `POSTGRES_TAG` doit égaler la version des données (lue sur le disque) |
+| OnlyOffice 10.0 → 10.1 | connecteur peut-être incompatible | refus sans `OO_CONFIRME=1` |
+| tout retour en arrière | impossible (Nextcloud, PostgreSQL) | refus |
+
+Nouveaux fichiers et cibles :
+
+| | Rôle |
+|---|---|
+| `scripts/commun.sh` | bibliothèque sourcée par tous les scripts : `compose()` (+ override), lecture/écriture du `.env` sans changer ses droits, garde-fous `verifier_*` |
+| `scripts/verifier_versions.sh` — `make verifier` | les garde-fous seuls ; lancé aussi par `make up` |
+| `scripts/upgrade_nextcloud.sh` — `make upgrade`, `make upgrade-check` | majeure Nextcloud **suivante** : image `N+1` publiée, au moins 2 correctifs (`MIN_CORRECTIF`), toutes les apps activées disponibles en stable pour la cible (API de l'app store, sinon refus sauf `APPS_OK=1`) ; écrit `NEXTCLOUD_TAG=N+1` puis lance `make update` ; remet le tag si l'échec survient avant la migration |
+
+Modifiés : `update_nextcloud.sh` (pull + garde-fous en étape 0, avant la sauvegarde ; le refus ne coupe rien), `pg_upgrade.sh` (écrit `POSTGRES_TAG`/`POSTGRES_MOUNT` dans le `.env` au lieu d'éditer le compose ; `PG_CIBLE` désormais obligatoire), Makefile, README, `env_example`, `.gitignore`.
+
+**La démarche, en résumé :** chaque composant a une seule commande pour changer de version (`make upgrade`, `make pg-upgrade`, `ONLYOFFICE_TAG` + `OO_CONFIRME=1`). `make update` ne fait que des correctifs. Les garde-fous refusent tout le reste avant de couper quoi que ce soit. Les versions vivent dans le `.env` de chaque instance, donc un `git pull` ne change jamais la version d'un serveur.
+
+Testé : les trois garde-fous passent sur l'installation actuelle ; refus vérifiés pour `POSTGRES_TAG=17/19`, mauvais `POSTGRES_MOUNT`, `NEXTCLOUD_TAG=32/34`, `ONLYOFFICE_TAG=10.1` ; `make upgrade-check` : « passerait de 33.0.10 à 34.0.5 », 9 apps compatibles ; édition du `.env` par `pg-upgrade` simulée pour 17 (ancien montage) → 18 et 18 → 19 ; `make onlyoffice` OK.
+
 ---
 
 ## Bugs rencontrés et corrections
@@ -252,7 +284,7 @@ Proposée par l'admin (34.0.5) le 8 novembre. Vérifié : image `nextcloud:34` d
 
 Nouveautés (« Hub 26 Spring ») : diagramme de Gantt et dépendances dans Deck ; délégation d'agenda et de mail ; CalDAV/CardDAV externes en lecture-écriture ; Talk (appel depuis n'importe quelle app, étiquettes et tri des conversations, réponse privée) ; édition hors ligne dans Text ; nouvelle navigation. Aucun retrait de fonctionnalité identifié. Source : https://nextcloud.com/blog/nextcloud-hub26-spring/
 
-**Décision :** attendre quelques jours de fonctionnement stable sur la 33 (sauvegardes nocturnes, `make check`, journal d'erreurs), pour ne pas mélanger d'éventuels problèmes de la 33 et de la 34. Ensuite : tag `nextcloud:34`, `make update`, migration MIME si demandée. Puis 35 (septembre 2027) de la même façon.
+**Décision :** attendre quelques jours de fonctionnement stable sur la 33 (sauvegardes nocturnes, `make check`, journal d'erreurs), pour ne pas mélanger d'éventuels problèmes de la 33 et de la 34. Ensuite : `make upgrade-check`, `make upgrade`, migration MIME si demandée. Puis 35 (septembre 2027) de la même façon.
 
 ---
 
@@ -268,5 +300,9 @@ Nouveautés (« Hub 26 Spring ») : diagramme de Gantt et dépendances dans Deck
 - [ ] Prévenir les membres : document OnlyOffice vide → désactiver le bloqueur de pub sur onlyoffice.lamiete.fr.
 - [ ] Double authentification : pas imposée pour l'instant (décision du 8 nov.) ; à régler dans Keycloak le jour venu.
 - [ ] Nextcloud 34 (voir ci-dessus).
-- [ ] Supprimer les dépôts `nextcloud31` et `nextcloud32` une fois l'instance codecommun passée sur ce dépôt.
-- [ ] Migrer `nuage.codecommun.coop` sur ce dépôt (`ROUTER_NAME=codecommun`).
+- [ ] Migrer `nuage.codecommun.coop` sur ce dépôt (procédure : README, « Passer une installation existante sur ce dépôt »). Points relevés dans `nextcloud32` :
+  - OnlyOffice 9.1 y tourne par un fichier à part, `compose-onlyoffice.yml`, avec son propre PostgreSQL 12 et RabbitMQ, et un secret JWT généré au hasard. Ce fichier disparaît au changement de dépôt : arrêter cette stack **avant** (`docker compose -f compose-onlyoffice.yml down`). Notre service `onlyoffice` la remplace, avec le JWT du `.env` et `make onlyoffice`. Le saut de 9.1 à 10.0 est sans données à migrer, puisque les documents sont dans Nextcloud.
+  - L'image est `postgres:17` (Debian trixie si elle a été tirée récemment) et le compose passe à `17-bookworm`. Une alerte « collation version mismatch » est possible : `make pg-upgrade PG_CIBLE=18`, juste après, reconstruit tout par dump/restauration.
+  - Il n'y a pas encore de sauvegarde borg : créer le dépôt BorgWarehouse et un `scripts/.env` avec un `BORG_PREFIX` propre à l'instance.
+- [ ] Puis : `.env` avec `ROUTER_NAME=codecommun` et ses versions **actuelles** (`NEXTCLOUD_TAG=32`, `POSTGRES_TAG=17`, `POSTGRES_MOUNT=/var/lib/postgresql/data`, à confirmer sur place), `make verifier`, puis `make update`, `make upgrade` (→ 33), `make pg-upgrade PG_CIBLE=18`. `extra_hosts` éventuels dans `docker-compose.override.yml`.
+- [ ] Archiver (plutôt que supprimer) `nextcloud31` et `nextcloud32` sur GitHub, avec un README « déplacé vers CoopCodeCommun/nextcloud » : la PR #1 de glungtung reste consultable.

@@ -1,10 +1,14 @@
 services:
   nextcloud_db:
-    image: postgres:18-bookworm
+    # Version : POSTGRES_TAG du .env. Ne JAMAIS la changer a la main : une image
+    # plus recente cree une base vide a cote -> make pg-upgrade PG_CIBLE=19
+    image: postgres:${POSTGRES_TAG:?POSTGRES_TAG doit etre renseigne dans .env}-bookworm
     hostname: nextcloud_db
     restart: always
     volumes:               
-     - ./database:/var/lib/postgresql
+     # PG >= 18 : /var/lib/postgresql (donnees dans database/18/docker).
+     # PG <= 17 : POSTGRES_MOUNT=/var/lib/postgresql/data dans le .env.
+     - ./database:${POSTGRES_MOUNT:-/var/lib/postgresql}
     env_file: .env   
     networks:            
       - nextcloud_db      
@@ -18,7 +22,9 @@ services:
 
   nextcloud_app:  
     hostname: nextcloud_app
-    image: nextcloud:33
+    # Version : NEXTCLOUD_TAG du .env (une majeure : suit ses correctifs).
+    # Majeure suivante : make upgrade (une a la fois, apps verifiees).
+    image: nextcloud:${NEXTCLOUD_TAG:?NEXTCLOUD_TAG doit etre renseigne dans .env}
     restart: always
     depends_on:
       - nextcloud_db
@@ -33,6 +39,8 @@ services:
     # Option (repris de nextcloud32) : si le serveur ne sait pas se joindre par
     # sa propre IP publique (NAT sans hairpin), faire pointer les noms vers la
     # passerelle du reseau frontend (docker network inspect frontend).
+    # A mettre plutot dans docker-compose.override.yml (propre au serveur,
+    # ignore par git) : voir le README.
     # extra_hosts:
     #   - "nuage.$DOMAIN:172.18.0.1"
     #   - "onlyoffice.$DOMAIN:172.18.0.1"
@@ -59,15 +67,18 @@ services:
 
   onlyoffice:
     hostname: onlyoffice
-    # 10.0 : suit les correctifs 10.0.x (make update). Avant de passer en 10.1
-    # ou 11, verifier que le connecteur (app onlyoffice de Nextcloud) la supporte.
-    image: onlyoffice/documentserver:10.0
+    # Version : ONLYOFFICE_TAG du .env (10.0 : suit les correctifs 10.0.x).
+    # Avant de passer en 10.1 ou 11, verifier que le connecteur (app onlyoffice
+    # de Nextcloud) la supporte, puis : make update OO_CONFIRME=1
+    image: onlyoffice/documentserver:${ONLYOFFICE_TAG:?ONLYOFFICE_TAG doit etre renseigne dans .env}
     restart: always
     networks:
       - frontend
     # Option (repris de nextcloud32) : si le serveur ne sait pas se joindre par
     # sa propre IP publique (NAT sans hairpin), faire pointer les noms vers la
     # passerelle du reseau frontend (docker network inspect frontend).
+    # A mettre plutot dans docker-compose.override.yml (propre au serveur,
+    # ignore par git) : voir le README.
     # extra_hosts:
     #   - "nuage.$DOMAIN:172.18.0.1"
     #   - "onlyoffice.$DOMAIN:172.18.0.1"
