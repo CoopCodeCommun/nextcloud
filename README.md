@@ -142,14 +142,6 @@ borg de toute la stack (sauf `database/`, remplacée par le dump) → sortie de
 maintenance (garantie même en cas d'échec) → prune
 (7 jours, 30 quotidiennes, 12 hebdomadaires, puis mensuelles).
 
-### Libresign (optionnel)
-
-```bash
-make occ CMD="libresign:install --java"
-make occ CMD="libresign:install --pdftk"
-make occ CMD="libresign:install --jsignpdf"
-```
-
 ---
 
 ## Mises à jour
