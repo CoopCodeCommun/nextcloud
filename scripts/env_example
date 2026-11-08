@@ -1,11 +1,13 @@
-# Copier en scripts/.env puis : chmod 600 .env
+# Copier en scripts/.env puis : chmod 600 scripts/.env, et lancer make init
+# (qui remplit BORG_PREFIX, BORG_REPO et BORG_PASSPHRASE).
 # NE PAS mettre ces variables dans le .env de la stack : le compose le passe
 # en entier au conteneur PostgreSQL (env_file).
 
-# Prefixe des archives (garder "nuagefr" : continuite avec l'historique)
-BORG_PREFIX=nuagefr
-# Adresse du depot sur borgwarehouse
-BORG_REPO=ssh://borgwarehouse@localhost:2226/./XXXXXXXX
+# Prefixe des archives, propre a l'instance (lamiete : "nuagefr", pour la
+# continuite avec l'historique). Vide : make init propose <hote>-nextcloud.
+BORG_PREFIX=
+# Adresse du depot sur borgwarehouse (ssh://borgwarehouse@localhost:2226/./XXXXXXXX)
+BORG_REPO=
 # Passphrase du depot — AU COFFRE, avec `borg key export`
 BORG_PASSPHRASE=''
 

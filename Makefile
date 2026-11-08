@@ -1,11 +1,14 @@
 # Table des matieres de la stack Nextcloud. La logique vit dans scripts/.
-.PHONY: help up down restart logs ps occ backup check list verifier update upgrade upgrade-check onlyoffice pg-upgrade
+.PHONY: help up down restart logs ps occ init backup check list mount umount verifier update upgrade upgrade-check onlyoffice pg-upgrade
 
 DC := docker compose
 
 # La sauvegarde lit data/ (proprietaire www-data) : root obligatoire.
 # On ajoute sudo tout seul si on ne l'est pas.
 SUDO := $(shell [ "$$(id -u)" -eq 0 ] || echo sudo)
+
+# Point de montage de make mount (lisible par root seulement, comme data/).
+MOUNTPOINT ?= /tmp/borg-mount-nextcloud
 
 help:
 	@echo "Stack Nextcloud — cibles disponibles :"
@@ -17,9 +20,11 @@ help:
 	@echo "  make ps        etat des conteneurs"
 	@echo "  make occ CMD=\"status\"   lance une commande occ"
 	@echo ""
+	@echo "  make init      configure la sauvegarde : cle SSH, depot BWH, cron root (sudo)"
 	@echo "  make backup    lance une sauvegarde maintenant (sudo)"
 	@echo "  make check     verifie que la derniere sauvegarde est restaurable (sudo)"
 	@echo "  make list      liste les archives du depot (sudo)"
+	@echo "  make mount [ARCHIVE=<nom>] / make umount   archives en lecture seule (sudo)"
 	@echo ""
 	@echo "  make verifier       versions du .env compatibles avec l'installe ? (rien ne change)"
 	@echo "  make update         correctifs : sauvegarde, puis Nextcloud + OnlyOffice (sudo)"
@@ -51,14 +56,31 @@ ps:
 occ:
 	$(DC) exec -u www-data nextcloud_app php occ $(CMD)
 
+init:
+	@$(SUDO) bash scripts/init_backup.sh
+
 backup:
 	@$(SUDO) bash scripts/backup_nextcloud.sh
 
 check:
 	@$(SUDO) bash scripts/check_backup.sh
 
+# Cle dediee scripts/.ssh/<prefixe>_ed25519 si elle existe (make init),
+# sinon la cle de root (installation faite a la main).
+BORG_ENV = set -a; . scripts/.env; set +a; \
+	cle="$(CURDIR)/scripts/.ssh/$${BORG_PREFIX}_ed25519"; \
+	test ! -f "$$cle" || export BORG_RSH="/usr/bin/ssh -oStrictHostKeyChecking=accept-new -oIdentitiesOnly=yes -i $$cle";
+
 list:
-	@$(SUDO) bash -c 'set -a; . scripts/.env; set +a; borg list --glob-archives "$$BORG_PREFIX-*" "$$BORG_REPO"'
+	@$(SUDO) bash -c '$(BORG_ENV) borg list --glob-archives "$$BORG_PREFIX-*" "$$BORG_REPO"'
+
+mount:
+	@$(SUDO) bash -c '$(BORG_ENV) mkdir -p "$(MOUNTPOINT)"; \
+	 cible="$$BORG_REPO"; test -z "$(ARCHIVE)" || cible="$$BORG_REPO::$(ARCHIVE)"; \
+	 borg mount -o ro "$$cible" "$(MOUNTPOINT)" && echo "[mount] $(MOUNTPOINT) (sudo ls) - demonter : make umount"'
+
+umount:
+	@$(SUDO) borg umount "$(MOUNTPOINT)" && echo "[umount] $(MOUNTPOINT) demonte"
 
 verifier:
 	@bash scripts/verifier_versions.sh

@@ -36,9 +36,11 @@ make logs                   suit les logs de Nextcloud
 make ps                     état des conteneurs
 make occ CMD="status"       lance une commande occ
 
+make init                   configure la sauvegarde : clé SSH, dépôt BWH, cron root (sudo)
 make backup                 sauvegarde borg maintenant (sudo)
 make check                  vérifie que la dernière sauvegarde est restaurable (sudo)
 make list                   liste les archives du dépôt (sudo)
+make mount / umount         monte les archives en lecture seule (ARCHIVE=<nom>, sudo)
 
 make verifier               les versions du .env collent-elles à l'installé ? (rien ne change)
 make update                 correctifs : sauvegarde, puis Nextcloud + OnlyOffice (sudo)
@@ -71,7 +73,8 @@ Deux fichiers, à ne jamais commiter (voir `.gitignore`), en `chmod 600` :
   (`make verifier` le confirme) ; une base PostgreSQL ≤ 17 demande en plus
   `POSTGRES_MOUNT=/var/lib/postgresql/data`.
 - **`scripts/.env`** (sauvegarde) — copier `scripts/env_example` : `BORG_PREFIX`,
-  `BORG_REPO`, `BORG_PASSPHRASE`, `NC_MAINTENANCE`, `AGE_MAX_HEURES`.
+  `BORG_REPO`, `BORG_PASSPHRASE` (remplis par `make init`, voir « 6.
+  Sauvegardes »), `NC_MAINTENANCE`, `AGE_MAX_HEURES`.
   Ces variables ne vont **pas** dans le `.env` de la stack : il est passé en
   entier au conteneur PostgreSQL (`env_file`).
 
@@ -139,8 +142,7 @@ make occ CMD="app:disable app_api"     # sauf si vous utilisez des Ex-Apps
 # crontab de l'utilisateur (tâches de fond Nextcloud)
 */5 * * * * /usr/bin/docker compose -f /poule/miete/nextcloud/docker-compose.yml exec -T -u www-data nextcloud_app php -f /var/www/html/cron.php
 
-# crontab root (sudo crontab -e) : la sauvegarde lit data/, propriété de www-data
-# (adapter le chemin du journal)
+# crontab root (posée par make init) : la sauvegarde lit data/, propriété de www-data
 @daily bash /poule/miete/nextcloud/scripts/backup_nextcloud.sh >> /var/log/borg-nextcloud.log 2>&1
 ```
 
@@ -174,9 +176,28 @@ make onlyoffice
 
 ### 6. Sauvegardes
 
-1. Créer le dépôt dans BorgWarehouse et renseigner `scripts/.env`.
-2. `make backup`, puis `make check`.
-3. Exporter la clé du dépôt au coffre (`borg key export`) avec la passphrase.
+```bash
+cp scripts/env_example scripts/.env && chmod 600 scripts/.env
+make init
+```
+
+`make init` (le script du kit BorgWarehouse, comme pour Keycloak, Docuseal et
+Etherpad, adapté à root) : clé SSH dédiée dans `scripts/.ssh/`, création du
+dépôt sur BorgWarehouse (token API avec la seule permission « create », ou à
+la main), passphrase, `borg init`, affichage de la passphrase et de la clé du
+dépôt **à mettre au coffre**, ligne de cron root, première sauvegarde,
+`make check`. Rejouable s'il s'interrompt. Il **refuse** de toucher un dépôt
+qui contient déjà des archives (une nouvelle passphrase les rendrait
+illisibles) : sur une instance déjà sauvegardée, `make check` suffit. Il
+refuse aussi un dépôt qu'il ne peut pas lire (BorgWarehouse arrêté, sauvegarde
+en cours, clé refusée, passphrase fausse) : corriger, puis relancer. En
+méthode manuelle, relancer après avoir collé la clé publique dans BorgWarehouse.
+
+Sans `make init` : créer le dépôt dans BorgWarehouse, renseigner
+`scripts/.env`, `make backup`, `make check`, puis mettre au coffre la clé du
+dépôt (`borg key export`) avec la passphrase. Sans `scripts/.ssh/`, la
+sauvegarde utilise la clé SSH de root (cas de l'instance lamiete, configurée
+ainsi avant `make init`).
 
 Ce que fait `make backup` : mode maintenance → `pg_dump -Fc` → **une** archive
 borg de toute la stack (sauf `database/`, remplacée par le dump) → sortie de
@@ -237,14 +258,18 @@ ROUTER_NAME=codecommun
 JWT_SECRET=...                              # vide ? openssl rand -hex 32
 ```
 
-Puis `scripts/.env` (dépôt borg **propre à l'instance**, avec un `BORG_PREFIX` à elle).
+Puis la sauvegarde, dans un dépôt borg **propre à l'instance** avec un
+`BORG_PREFIX` à elle : `cp scripts/env_example scripts/.env && chmod 600
+scripts/.env`. `make init` vient à l'étape 5, une fois la stack démarrée (il
+fait la première sauvegarde).
 
 **5. Redémarrer et monter les versions, une étape à la fois :**
 
 ```bash
 make verifier                 # tout doit être OK, sinon corriger le .env
 make up && make onlyoffice    # même versions qu'avant, OnlyOffice reconnecté
-make backup && make check
+make init                     # dépôt borg, cron, 1re sauvegarde + check
+                              # (dépôt déjà configuré : make backup && make check)
 make update                   # correctifs
 make upgrade-check && make upgrade         # 32 -> 33
 make pg-upgrade PG_CIBLE=18                # 17 -> 18 (retire POSTGRES_MOUNT)
