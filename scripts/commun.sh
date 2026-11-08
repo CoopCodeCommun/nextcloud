@@ -31,7 +31,17 @@ compose() {
   fi
 }
 
-valeur_env() { sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$STACK_ENV" | tail -n1 | tr -d "'\""; }
+# Retire seulement des guillemets ENCADRANTS ('x' ou "x") : un secret qui
+# contient une apostrophe ou un guillemet reste intact.
+valeur_env() {
+  local v
+  v="$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$STACK_ENV" | tail -n1)"
+  case "$v" in
+    \'*\') v="${v#\'}"; v="${v%\'}" ;;
+    \"*\") v="${v#\"}"; v="${v%\"}" ;;
+  esac
+  printf '%s\n' "$v"
+}
 
 # Ecrit K=V dans le .env. `cat >` reecrit le fichier en place : le .env garde
 # son proprietaire et son chmod 600, meme lance en root (sed -i, lui, le
@@ -58,9 +68,12 @@ majeure() { printf '%s' "${1%%.*}"; }
 
 # Version de Nextcloud INSTALLEE (le code dans data/, celui que compare
 # l'entrypoint de l'image). Vide si pas encore installe.
+# Present mais illisible (droits, sans sudo) : ERREUR, surtout pas "pas
+# installe" (ce qui ferait accepter n'importe quel NEXTCLOUD_TAG).
 nc_version_installee() {
   local f="$STACK_DIR/data/www/html/version.php"
-  [ -r "$f" ] || return 0
+  [ -e "$f" ] || return 0
+  [ -r "$f" ] || { echo "[versions] ERREUR : $f illisible (relancer avec sudo)." >&2; return 1; }
   sed -n "s/^\$OC_VersionString = '\([^']*\)'.*/\1/p" "$f"
 }
 
@@ -101,7 +114,41 @@ verifier_tags() {
   for k in NEXTCLOUD_TAG POSTGRES_TAG ONLYOFFICE_TAG ROUTER_NAME; do
     [ -n "$(valeur_env "$k")" ] || { echo "[versions] $k absent du .env (voir env_example)" >&2; ok=1; }
   done
+  # Le compose ajoute -bookworm : POSTGRES_TAG=18-bookworm donnerait 18-bookworm-bookworm.
+  case "$(valeur_env POSTGRES_TAG)" in
+    *[!0-9]*) echo "[versions] POSTGRES_TAG=$(valeur_env POSTGRES_TAG) : un numero de majeure seul (ex. 18)." >&2; ok=1 ;;
+  esac
+  verifier_projet || ok=1
   return $ok
+}
+
+# Nom du projet compose (COMPOSE_PROJECT_NAME du .env, sinon le nom du
+# dossier). Deux instances avec le MEME nom se prennent leurs conteneurs : le
+# `up` de l'une recree ceux de l'autre avec sa propre config (sa base, son
+# dossier data/). On refuse si ce nom est deja utilise par un autre dossier.
+nom_projet() {
+  local n; n="$(valeur_env COMPOSE_PROJECT_NAME)"
+  [ -n "$n" ] || n="$(basename "$STACK_DIR")"
+  printf '%s\n' "$n"
+}
+verifier_projet() {
+  local nom ici d autres=""
+  nom="$(nom_projet)"
+  ici="$(readlink -f "$STACK_DIR")"
+  # Dossier de travail (label de chaque conteneur) des conteneurs de ce projet,
+  # compare en chemin reel (liens : /home/jonas/miete -> /poule/miete).
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    [ "$(readlink -f "$d" 2>/dev/null || printf '%s' "$d")" = "$ici" ] || autres="$autres$d"$'\n'
+  done < <(docker ps -a --filter "label=com.docker.compose.project=$nom" \
+             --format '{{.Label "com.docker.compose.project.working_dir"}}' 2>/dev/null | sort -u)
+  autres="${autres%$'\n'}"
+  if [ -n "$autres" ]; then
+    echo "[versions] ERREUR : le projet compose \"$nom\" est deja celui d'une autre instance :" >&2
+    printf '%s\n' "$autres" | sed 's/^/             /' >&2
+    echo "           Donner un nom unique : COMPOSE_PROJECT_NAME=nextcloud_<instance> dans le .env." >&2
+    return 1
+  fi
 }
 
 # PostgreSQL : le tag doit etre EXACTEMENT la version des donnees. Une image
@@ -114,6 +161,16 @@ verifier_postgres() {
   clusters="$(pg_clusters)" || { echo "[versions] lecture de database/ impossible" >&2; return 1; }
   n="$(printf '%s' "$clusters" | grep -c . || true)"
   if [ "$n" -eq 0 ]; then
+    # Pas de base mais Nextcloud installe : PostgreSQL en creerait une VIDE et
+    # Nextcloud tournerait dessus. database/ deplace ? retour arriere rate ?
+    local nc
+    nc="$(nc_version_installee)" || return 1
+    if [ -n "$nc" ]; then
+      echo "[versions] ERREUR : Nextcloud $nc est installe, mais database/ ne contient aucune base." >&2
+      echo "           Une base vide serait creee. Chercher l'ancienne (database.pg*/," >&2
+      echo "           database.echec-*/) ou restaurer la sauvegarde (make list)." >&2
+      return 1
+    fi
     echo "[versions] PostgreSQL : pas encore de base (nouvelle installation) -> PG $tag."
     return 0
   fi
@@ -154,7 +211,7 @@ verifier_postgres() {
 verifier_nextcloud() {
   local image installee cible mi mc
   image="nextcloud:$(valeur_env NEXTCLOUD_TAG)"
-  installee="$(nc_version_installee)"
+  installee="$(nc_version_installee)" || return 1
   cible="$(nc_version_image "$image")"
   if [ -z "$cible" ]; then
     echo "[versions] ERREUR : image $image absente en local (docker compose pull)." >&2; return 1
@@ -187,7 +244,8 @@ verifier_nextcloud() {
 verifier_onlyoffice() {
   local voulu actuel id
   voulu="onlyoffice/documentserver:$(valeur_env ONLYOFFICE_TAG)"
-  id="$(compose ps -q onlyoffice 2>/dev/null || true)"
+  # -a : un conteneur arrete compte aussi (sinon changement de tag accepte).
+  id="$(compose ps -aq onlyoffice 2>/dev/null | head -n1 || true)"
   [ -n "$id" ] || { echo "[versions] OnlyOffice : pas de conteneur -> $voulu."; return 0; }
   actuel="$(docker inspect -f '{{.Config.Image}}' "$id")"
   if [ "$actuel" != "$voulu" ] && [ "${OO_CONFIRME:-0}" != 1 ]; then

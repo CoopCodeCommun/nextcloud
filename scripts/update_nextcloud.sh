@@ -113,7 +113,14 @@ while :; do
   if [ "$ATTENTE" -ge "$TIMEOUT" ]; then
     echo "[nc-update] ECHEC : Nextcloud n'a pas fini sa mise a jour en ${TIMEOUT}s." >&2
     compose logs --tail 60 "$APP_SERVICE" >&2 || true
-    echo "[nc-update] Sauvegarde d'avant mise a jour : make list (archives nuagefr-*)." >&2
+    if printf '%s' "$STATUS" | grep -q '"needsDbUpgrade":true'; then
+      # Le nouveau code est copie mais sa migration n'a pas tourne (ex. base
+      # pas prete au moment ou l'image l'a lancee) : l'image ne la relancera
+      # pas d'elle-meme, les versions code / installe etant maintenant egales.
+      echo "[nc-update] Nouveau code en place, migration de la base NON faite : lancer" >&2
+      echo "            make occ CMD=upgrade   puis relancer make update (finitions)." >&2
+    fi
+    echo "[nc-update] Sauvegarde d'avant mise a jour : make list." >&2
     exit 1
   fi
   sleep 10
@@ -134,8 +141,16 @@ occ app:list --disabled --shipped=false 2>/dev/null | sed 's/^/[nc-update] app d
 
 #### 7. ONLYOFFICE ####
 etape "7/7 OnlyOffice"
-bash "$SCRIPT_DIR/onlyoffice_connect.sh"
+# Non bloquant : la mise a jour de Nextcloud est faite a ce stade. Un echec
+# ici (ex. sauvegarde du cron en cours, Nextcloud en maintenance) ne doit pas
+# la faire passer pour ratee (make upgrade croirait a une migration echouee).
+OO_KO=0
+bash "$SCRIPT_DIR/onlyoffice_connect.sh" || OO_KO=1
 
 etape "termine"
 occ status
+if [ "$OO_KO" = 1 ]; then
+  echo "[nc-update] ATTENTION : Nextcloud est a jour, mais la connexion a OnlyOffice" >&2
+  echo "            a echoue (voir plus haut). La relancer : make onlyoffice" >&2
+fi
 echo "[nc-update] Avertissements restants : make occ CMD=setupchecks"

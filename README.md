@@ -59,32 +59,51 @@ La logique vit dans `scripts/` ; le Makefile n'est qu'une table des matières.
 
 ## Installation
 
+### 0. Prérequis sur le serveur
+
+- Docker avec le plugin compose, l'utilisateur dans le groupe `docker` ;
+  `borg`, `flock`, `curl` et `openssl` sur l'hôte (sauvegarde) ; `sudo`.
+- Traefik v3 (dépôt TraefikV3) déjà en place, avec :
+  - le réseau externe `frontend` (`docker network create frontend`) ;
+  - un certresolver nommé **`myresolver`** ;
+  - un middleware **`crowdsec@file`** dans son provider file (sans lui, Traefik
+    rejette le routeur : Nextcloud injoignable).
+- DNS : `nuage.<DOMAIN>` et `onlyoffice.<DOMAIN>` vers le serveur.
+
 ### 1. Fichiers `.env`
 
 Deux fichiers, à ne jamais commiter (voir `.gitignore`), en `chmod 600` :
 
 - **`.env`** (stack) — copier `env_example` : `POSTGRES_*`, `DOMAIN`,
-  `NEXTCLOUD_TRUSTED_DOMAINS`, `JWT_SECRET`, `ROUTER_NAME`, et les versions
-  `NEXTCLOUD_TAG`, `POSTGRES_TAG`, `ONLYOFFICE_TAG`.
-  Générer le secret OnlyOffice : `openssl rand -hex 32`.
-  `ROUTER_NAME` suffixe les routeurs Traefik : **unique par instance** si
-  plusieurs Nextcloud partagent le même Traefik (ex. `lamiete`, `codecommun`).
-  Pour une instance existante, les versions sont **celles déjà installées**
-  (`make verifier` le confirme) ; une base PostgreSQL ≤ 17 demande en plus
-  `POSTGRES_MOUNT=/var/lib/postgresql/data`.
+  `JWT_SECRET`, `ROUTER_NAME`, et les versions `NEXTCLOUD_TAG`, `POSTGRES_TAG`,
+  `ONLYOFFICE_TAG`. Générer le secret OnlyOffice : `openssl rand -hex 32`.
+  - `ROUTER_NAME` suffixe les routeurs Traefik : **unique par instance** si
+    plusieurs Nextcloud partagent le même Traefik (ex. `lamiete`, `codecommun`).
+  - `COMPOSE_PROJECT_NAME` : **unique par instance sur un même serveur**, à
+    fixer avant le premier `make up` (ex. `nextcloud_codecommun`). Vide, c'est
+    le nom du dossier (`nextcloud` pour lamiete). Deux instances avec le même
+    nom se prendraient leurs conteneurs : `make verifier` refuse ce cas.
+  - Pour une instance existante, les versions sont **celles déjà installées**
+    (`make verifier` le confirme) ; une base PostgreSQL ≤ 17 demande en plus
+    `POSTGRES_MOUNT=/var/lib/postgresql/data`.
 - **`scripts/.env`** (sauvegarde) — copier `scripts/env_example` : `BORG_PREFIX`,
   `BORG_REPO`, `BORG_PASSPHRASE` (remplis par `make init`, voir « 6.
-  Sauvegardes »), `NC_MAINTENANCE`, `AGE_MAX_HEURES`.
-  Ces variables ne vont **pas** dans le `.env` de la stack : il est passé en
-  entier au conteneur PostgreSQL (`env_file`).
+  Sauvegardes »), `NC_MAINTENANCE`, `AGE_MAX_HEURES`. À part : la passphrase
+  n'a rien à faire avec les variables du compose.
 
-Puis : `make up`.
+Puis : `make up` (PostgreSQL démarre d'abord ; Nextcloud attend qu'il accepte
+les connexions), et l'**installateur web** sur `https://nuage.<DOMAIN>` :
+compte admin, base PostgreSQL, hôte `nextcloud_db`, base / utilisateur / mot
+de passe = `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` du `.env`.
 
 Aucun port n'est publié sur l'hôte : tout passe par Traefik (réseau `frontend`),
 y compris les échanges Nextcloud ↔ OnlyOffice, qui utilisent les adresses
 publiques en HTTPS. Pas de `container_name` non plus : les conteneurs
-s'appellent `<dossier>-<service>-1`, et les scripts passent par
-`docker compose`.
+s'appellent `<projet>-<service>-1`, et les scripts passent par
+`docker compose`. Sur le réseau `frontend`, partagé, les noms courts
+(`onlyoffice`, `nextcloud_app`) sont ambigus dès qu'il y a deux instances :
+ne jamais s'en servir comme adresse (`make onlyoffice` utilise les URL
+publiques).
 
 Réglages propres à un serveur : dans `docker-compose.override.yml` (ignoré par
 git, chargé par `docker compose` comme par les scripts), pas dans le compose
@@ -106,7 +125,7 @@ services:
 ```php
   'trusted_proxies' =>
   array (
-    1 => '172.18.0.0/24',
+    1 => '172.18.0.0/24',   // sous-réseau de frontend : docker network inspect frontend
   ),
   'overwritehost'     => 'nuage.lamiete.fr',
   'overwriteprotocol' => 'https',
@@ -142,9 +161,15 @@ make occ CMD="app:disable app_api"     # sauf si vous utilisez des Ex-Apps
 # crontab de l'utilisateur (tâches de fond Nextcloud)
 */5 * * * * /usr/bin/docker compose -f /poule/miete/nextcloud/docker-compose.yml exec -T -u www-data nextcloud_app php -f /var/www/html/cron.php
 
-# crontab root (posée par make init) : la sauvegarde lit data/, propriété de www-data
-@daily bash /poule/miete/nextcloud/scripts/backup_nextcloud.sh >> /var/log/borg-nextcloud.log 2>&1
+# crontab root, posée par make init (heure demandée) : la sauvegarde lit data/,
+# propriété de www-data
+0 0 * * * bash /poule/miete/nextcloud/scripts/backup_nextcloud.sh >> /var/log/borg-nextcloud-<prefixe>.log 2>&1
 ```
+
+Instance déjà sauvegardée (lamiete) : `make init` refuse de toucher le dépôt,
+la ligne root a été posée à la main ; la vérifier avec `sudo crontab -l`.
+Plusieurs instances : une heure différente chacune (chaque sauvegarde met
+Nextcloud en maintenance).
 
 Toutes les 5 minutes, comme le recommande Nextcloud : avec `@hourly`, les tâches
 de fond (notifications, nettoyages…) prenaient jusqu'à une heure de retard.
@@ -167,7 +192,8 @@ make onlyoffice
 # [onlyoffice] OK — Nextcloud et le Document Server se parlent.
 ```
 
-`make update` le relance automatiquement. Rejouable à volonté.
+`make update` le relance automatiquement. Rejouable à volonté. Sur une
+instance neuve : après l'installateur web (il faut un Nextcloud installé).
 
 > **Document vide dans l'éditeur ?** Un bloqueur de pub (uBlock Origin…) bloque
 > `Analytics.js`, dont l'éditeur a besoin pour démarrer. Désactiver le bloqueur
@@ -221,7 +247,8 @@ git n'y touche pas.
 cd /chemin/de/l/instance
 mkdir -p ~/avant-unification
 
-# 0. Sauvegarde à la main (l'ancien dépôt n'a pas de make backup)
+# 0. Sauvegarde à la main (l'ancien dépôt n'a pas de make backup).
+#    Nom du service de la base dans l'ancien compose : docker compose config --services
 docker compose exec -T nextcloud_db sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB"' \
   > ~/avant-unification/base.dump </dev/null
 # + une copie de data/ si aucune sauvegarde des fichiers n'existe
@@ -232,19 +259,29 @@ git diff           > ~/avant-unification/modifs-locales.diff   # retouches faite
 cp -a docker-compose.yml compose-onlyoffice.yml README.md .env ~/avant-unification/ 2>/dev/null
 docker compose ps; docker ps --filter name=onlyoffice          # ce qui tourne vraiment
 
+# 1 bis. L'ancien dépôt ne doit suivre AUCUNE donnée ni secret : le checkout
+#        de l'étape 3 SUPPRIME les fichiers suivis qui n'existent pas ici.
+git ls-files | grep -E '^(\.env|data/|database/)'   # doit ne rien afficher, sinon :
+# git rm -r --cached <ces chemins>    (les retire de git, PAS du disque)
+
 # 2. Arrêter l'ancienne stack AVEC l'ancien compose (il connaît ses container_name)
 docker compose -f compose-onlyoffice.yml down    # seulement si OnlyOffice tournait par lui
 docker compose down
 
-# 3. Basculer sur ce dépôt
+# 3. Basculer sur ce dépôt. Les fichiers suivis modifiés sur place (tracés à
+#    l'étape 1 dans modifs-locales.diff) font refuser le checkout : on les
+#    remet d'abord comme dans l'ancien dépôt.
+git checkout -- .
 git remote set-url origin git@github.com:CoopCodeCommun/nextcloud.git
 git fetch origin
 git checkout -B main origin/main     # remplace les fichiers suivis, garde .env/data/database
-git branch -u origin/main            # ensuite, de simples `git pull`
 ```
 
-Si git refuse (« would be overwritten »), un fichier non suivi porte le nom
-d'un fichier du dépôt : le déplacer dans `~/avant-unification/`, puis relancer.
+Si git refuse encore (« would be overwritten »), un fichier **non suivi** porte
+le nom d'un fichier du dépôt : le déplacer dans `~/avant-unification/`, puis
+relancer. Disparaissent du dossier : les fichiers de l'ancien dépôt absents de
+celui-ci (`compose-onlyoffice.yml`, anciens scripts…) ; ils restent dans
+`~/avant-unification/` et dans l'historique de l'ancien dépôt.
 
 **4. Compléter le `.env`** (voir `env_example`) avec les versions **qui tournent
 aujourd'hui**, pas celles visées :
@@ -255,8 +292,12 @@ POSTGRES_TAG=17                             # sudo cat database/PG_VERSION
 POSTGRES_MOUNT=/var/lib/postgresql/data     # base <= 17 : ancienne disposition
 ONLYOFFICE_TAG=10.0
 ROUTER_NAME=codecommun
+COMPOSE_PROJECT_NAME=nextcloud_codecommun   # si une autre instance tourne sur ce serveur
 JWT_SECRET=...                              # vide ? openssl rand -hex 32
 ```
+
+Les variables inutiles de l'ancien `.env` (`POSTGRES_HOST`,
+`NEXTCLOUD_TRUSTED_DOMAINS`…) peuvent rester : rien ne les lit.
 
 Puis la sauvegarde, dans un dépôt borg **propre à l'instance** avec un
 `BORG_PREFIX` à elle : `cp scripts/env_example scripts/.env && chmod 600
@@ -271,9 +312,20 @@ make up && make onlyoffice    # même versions qu'avant, OnlyOffice reconnecté
 make init                     # dépôt borg, cron, 1re sauvegarde + check
                               # (dépôt déjà configuré : make backup && make check)
 make update                   # correctifs
-make upgrade-check && make upgrade         # 32 -> 33
 make pg-upgrade PG_CIBLE=18                # 17 -> 18 (retire POSTGRES_MOUNT)
+make upgrade-check && make upgrade         # 32 -> 33
 ```
+
+PostgreSQL **avant** Nextcloud, comme pour lamiete : si l'ancienne image
+n'était pas `-bookworm` (ex. `postgres:17` sur Debian 13), les index texte
+peuvent ne plus correspondre au tri de la glibc de l'image figée
+(« collation version mismatch » dans les logs). Le dump / restauration de
+`make pg-upgrade` les reconstruit ; la migration de schéma de Nextcloud se
+fait ensuite sur une base saine. Nextcloud 32 fonctionne avec PostgreSQL 18
+(simple avertissement).
+
+Lancer `make update`, `make upgrade` et `make pg-upgrade` **hors de l'heure
+de la sauvegarde** (cron root) : elle met Nextcloud en maintenance.
 
 Adapter enfin les crontabs (section Installation) : sans `container_name`, la
 ligne `cron.php` passe par `docker compose -f …/docker-compose.yml exec`.
@@ -299,8 +351,13 @@ ne coupe rien.
 
 `make update` suit les correctifs de `NEXTCLOUD_TAG` (33 → 33.0.x) :
 sauvegarde → apps à jour → arrêt propre d'OnlyOffice → redémarrage → attente de
-la migration (jusqu'à 30 min) → index et colonnes manquants → apps →
-reconnexion OnlyOffice.
+la migration (jusqu'à 30 min, `TIMEOUT=3600 make update` pour plus) → index
+et colonnes manquants → apps → reconnexion OnlyOffice (non bloquante : en cas
+d'échec, `make onlyoffice`).
+
+Si l'attente échoue avec « migration de la base NON faite »
+(`needsDbUpgrade`) : le nouveau code est en place mais sa migration n'a pas
+tourné. `make occ CMD=upgrade`, puis `make update` pour les finitions.
 
 Majeure suivante :
 

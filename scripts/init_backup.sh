@@ -15,7 +15,8 @@ set -euo pipefail
 # Version Nextcloud du init_backup.sh du kit (borgwarehouse/scripts/), comme
 # ceux des stacks Keycloak, Docuseal et Etherpad. Differences :
 #   - ROOT obligatoire : data/ appartient a www-data. La cle SSH, le cron et le
-#     log (/var/log/borg-nextcloud.log) sont donc ceux de root ;
+#     journal (/var/log/borg-nextcloud-<prefixe>.log) sont donc ceux de root ;
+#   - heure de la sauvegarde demandee : une heure differente par instance ;
 #   - pas de BACKUP_TYPE : le script de sauvegarde est backup_nextcloud.sh ;
 #   - scripts/.env part de env_example : les cles BORG_* y sont deja (vides),
 #     on les REMPLACE au lieu d'ajouter des lignes a la fin.
@@ -43,7 +44,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd -P)"
 ENV_FILE="${ENV_FILE:-$SCRIPT_DIR/.env}"
 SCRIPT_BACKUP="$SCRIPT_DIR/backup_nextcloud.sh"
-LOG_FILE="${LOG_FILE:-/var/log/borg-nextcloud.log}"
+# Journal : /var/log/borg-nextcloud-<prefixe>.log (un par instance), fixe
+# une fois le prefixe connu. LOG_FILE=... pour l'imposer.
+LOG_FILE="${LOG_FILE:-}"
+# Instance : ROUTER_NAME du .env de la stack (unique par instance), pour
+# proposer un prefixe qui ne collisionne pas avec une autre instance.
+ROUTER_NAME="$(sed -n 's/^[[:space:]]*ROUTER_NAME[[:space:]]*=[[:space:]]*//p' "$(dirname "$SCRIPT_DIR")/.env" 2>/dev/null | tail -n1 | tr -d "'\"")"
 
 BW_API_URL_DEFAUT="http://localhost:3000"
 BW_SSH_PORT_DEFAUT="2226"
@@ -173,7 +179,7 @@ echo
 # Depot deja dans scripts/.env : le prefixe nomme sa cle SSH (deja connue de
 # BWH), on ne le change pas.
 if [ "$REPRISE" = 0 ] && [ "$DEPOT_PREVU" = 0 ]; then
-  BORG_PREFIX="$(demander "Prefixe des archives (nomme aussi la cle SSH)" "${BORG_PREFIX:-$(hostname -s)-nextcloud}")"
+  BORG_PREFIX="$(demander "Prefixe des archives (nomme aussi la cle SSH)" "${BORG_PREFIX:-nextcloud-${ROUTER_NAME:-$(hostname -s)}}")"
   # Un prefixe avec des espaces casserait le nom des archives et le glob du prune.
   case "$BORG_PREFIX" in
     ''|*[!a-zA-Z0-9_-]*) erreur "prefixe invalide : lettres, chiffres, - et _ uniquement." ;;
@@ -184,17 +190,29 @@ fi
 
 # La frequence est demandee AVANT de creer le depot : elle determine l'alerte
 # BWH et le seuil de make check, qui doivent rester coherents entre eux.
-# Pas d'horaire : chaque sauvegarde met Nextcloud en maintenance.
+# Pas de frequence horaire : chaque sauvegarde met Nextcloud en maintenance.
 echo
 dire "Frequence de sauvegarde :"
 echo "   1) quotidienne (recommande)"
 echo "   2) hebdomadaire"
 echo "   3) aucune (je poserai le cron moi-meme)"
 case "$(demander "Ton choix" "1")" in
-  2) PLANIF="@weekly" ; ALERTE=864000 ; AGE_MAX=169 ;;
-  3) PLANIF=""        ; ALERTE=90000  ; AGE_MAX=25  ;;
-  *) PLANIF="@daily"  ; ALERTE=90000  ; AGE_MAX=25  ;;
+  2) JOURS="0"  ; ALERTE=864000 ; AGE_MAX=169 ;;
+  3) JOURS=""   ; ALERTE=90000  ; AGE_MAX=25  ;;
+  *) JOURS="*"  ; ALERTE=90000  ; AGE_MAX=25  ;;
 esac
+PLANIF=""
+if [ -n "$JOURS" ]; then
+  # Une autre instance sur le meme serveur : une autre heure, sinon deux
+  # maintenances et deux borg create en meme temps.
+  HEURE="$(demander "Heure de la sauvegarde (0-23, une autre par instance)" "0")"
+  case "$HEURE" in
+    [0-9]|1[0-9]|2[0-3]) : ;;
+    *) erreur "heure invalide : 0 a 23." ;;
+  esac
+  PLANIF="0 $HEURE * * $JOURS"
+fi
+LOG_FILE="${LOG_FILE:-/var/log/borg-nextcloud-$BORG_PREFIX.log}"
 
 
 #### 2. CLE SSH DEDIEE (une cle = un depot sur BWH) ####

@@ -9,9 +9,27 @@ services:
      # PG >= 18 : /var/lib/postgresql (donnees dans database/18/docker).
      # PG <= 17 : POSTGRES_MOUNT=/var/lib/postgresql/data dans le .env.
      - ./database:${POSTGRES_MOUNT:-/var/lib/postgresql}
-    env_file: .env   
-    networks:            
-      - nextcloud_db      
+    # Seulement ces trois variables (pas env_file: .env) : le conteneur ne
+    # recoit pas les autres secrets (JWT_SECRET...), et une modification du
+    # .env sans rapport (NEXTCLOUD_TAG...) ne le recree plus.
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB doit etre renseigne dans .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER doit etre renseigne dans .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD doit etre renseigne dans .env}
+    # "Pret" = accepte les connexions : Nextcloud attend ce feu vert pour
+    # demarrer (sa migration d'une montee de version echouerait sur une base
+    # qui redemarre encore).
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 2s
+    # Arret propre (checkpoint) au lieu d'un SIGKILL au bout de 10 s.
+    stop_grace_period: 60s
+    networks:
+      - nextcloud_db
 
   nextcloud_redis:
     hostname: nextcloud_redis
@@ -27,7 +45,10 @@ services:
     image: nextcloud:${NEXTCLOUD_TAG:?NEXTCLOUD_TAG doit etre renseigne dans .env}
     restart: always
     depends_on:
-      - nextcloud_db
+      nextcloud_db:
+        condition: service_healthy
+      nextcloud_redis:
+        condition: service_started
     volumes:
       - ./data/www/html:/var/www/html
     environment:

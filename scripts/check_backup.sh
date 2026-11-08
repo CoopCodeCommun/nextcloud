@@ -73,6 +73,9 @@ CONTENU="$(borg list --format '{size}{TAB}{path}{NL}' "$BORG_REPO::$ARCHIVE")"
 fichiers_sous() {  # <prefixe> -> nb de fichiers non vides
   printf '%s\n' "$CONTENU" | awk -F'\t' -v p="$1" '$1 > 0 && index($2, p) == 1' | wc -l
 }
+present() {  # <chemin exact> -> 0 s'il est dans l'archive (.env.bak ne compte pas)
+  awk -F'\t' -v p="$1" '$2 == p { trouve = 1 } END { exit !trouve }' <<< "$CONTENU"
+}
 
 CHEMIN_DUMP="$(printf '%s\n' "$CONTENU" | awk -F'\t' '$1 > 0 {print $2}' \
   | grep -E '/pg-dump-[^/]+/[^/]+\.dump$' | head -n1 || true)"
@@ -82,7 +85,7 @@ else
   ko "aucun dump PostgreSQL dans l'archive."
 fi
 
-if grep -qF "	$RACINE/data/www/html/config/config.php" <<< "$CONTENU"; then
+if present "$RACINE/data/www/html/config/config.php"; then
   ok "config.php present"
 else
   ko "config.php absent : l'instance ne serait pas remontable telle quelle."
@@ -95,7 +98,7 @@ else
   ko "data/ vide ou absent : les fichiers des utilisateurs ne sont PAS sauvegardes (lance en root ?)"
 fi
 
-if grep -qF "	$RACINE/.env" <<< "$CONTENU"; then
+if present "$RACINE/.env"; then
   ok ".env de la stack present"
 else
   ko ".env de la stack absent."

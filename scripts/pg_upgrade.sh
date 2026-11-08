@@ -48,6 +48,9 @@ from information_schema.tables where table_schema = 'public' and table_type = 'B
 
 [ "$(id -u)" -eq 0 ] || { echo "[pg-upgrade] a lancer en root (make pg-upgrade ajoute sudo)." >&2; exit 1; }
 [ -n "$PG_CIBLE" ] || { echo "[pg-upgrade] preciser la cible : make pg-upgrade PG_CIBLE=19" >&2; exit 1; }
+# Un numero de majeure seul : "19-bookworm" ferait echouer les comparaisons
+# et conclure a tort "rien a faire" (le suffixe -bookworm est ajoute ici).
+case "$PG_CIBLE" in *[!0-9]*) echo "[pg-upgrade] PG_CIBLE=$PG_CIBLE : un numero de version majeure seul (ex. 19)." >&2; exit 1 ;; esac
 # Etat de depart coherent : POSTGRES_TAG = version des donnees.
 verifier_postgres || exit 1
 
@@ -88,8 +91,10 @@ NC_DBPASS="$(occ config:system:get dbpassword)"
 occ maintenance:mode --on
 compose stop "$APP_SERVICE"
 # Si on echoue AVANT de toucher a la base : on remet simplement Nextcloud.
-trap 'echo "[pg-upgrade] ECHEC avant changement de base : redemarrage de Nextcloud." >&2;
-      compose start "$APP_SERVICE"; sleep 5; occ maintenance:mode --off || true' EXIT
+# La base aussi : un echec a l'etape 4 (cp, mv) survient apres son arret, et
+# database/ est alors toujours en place.
+trap 'echo "[pg-upgrade] ECHEC avant changement de base : redemarrage de la base et de Nextcloud." >&2;
+      compose start "$DB_SERVICE" "$APP_SERVICE"; sleep 10; occ maintenance:mode --off || true' EXIT
 
 
 #### 3. DUMP + COMPTAGE ####
@@ -138,8 +143,12 @@ else
   MONTAGE_ATTENDU=/var/lib/postgresql
 fi
 compose config -q
-compose config --images | grep -qx "$IMAGE_CIBLE" \
-  && compose config | grep -qE "^ *target: $MONTAGE_ATTENDU\$" \
+# Sorties capturees puis grep sur here-string : `compose config | grep -q`
+# sous pipefail peut echouer par SIGPIPE (faux echec -> retour arriere).
+IMAGES_CFG="$(compose config --images)"
+CFG="$(compose config)"
+grep -qx "$IMAGE_CIBLE" <<<"$IMAGES_CFG" \
+  && grep -qE "^ *target: $MONTAGE_ATTENDU\$" <<<"$CFG" \
   || { echo "[pg-upgrade] edition du .env inattendue (image ou montage)" >&2; exit 1; }
 
 
@@ -165,7 +174,9 @@ compose exec -T "$DB_SERVICE" sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRE
 
 # Mots de passe re-haches en scram, droits identiques a l'ancienne base.
 sql_lit() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
-SUPER_PASS="$(sed -n 's/^POSTGRES_PASSWORD=//p' "$STACK_DIR/.env" | tail -n1 | tr -d "'\"")"
+# Lu dans le conteneur (la valeur exacte qu'a recue l'image, guillemets du
+# .env deja interpretes par compose) et non en relisant le .env.
+SUPER_PASS="$(compose exec -T "$DB_SERVICE" sh -c 'printf %s "$POSTGRES_PASSWORD"' </dev/null)"
 # PIEGE (vecu en 13 -> 18) : un `compose exec` lance DANS un pipeline lit le
 # stdin du pipeline et avale le SQL -> psql ne recoit rien, les mots de passe
 # restent en md5. Tout ce qui interroge le conteneur se fait donc AVANT, avec

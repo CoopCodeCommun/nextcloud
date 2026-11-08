@@ -1,12 +1,19 @@
+# Superutilisateur PostgreSQL cree au premier demarrage (l'installateur web
+# de Nextcloud s'en sert, hote : nextcloud_db)
 POSTGRES_DB=
 POSTGRES_USER=
 POSTGRES_PASSWORD=
-POSTGRES_HOST=
+# Domaine : nuage.<DOMAIN> et onlyoffice.<DOMAIN>
 DOMAIN=
-NEXTCLOUD_TRUSTED_DOMAINS=
+# Secret partage Nextcloud <-> OnlyOffice : openssl rand -hex 32
 JWT_SECRET=
 # Suffixe des routeurs Traefik : unique par instance sur un meme Traefik (ex. lamiete, codecommun)
 ROUTER_NAME=
+# Nom du projet docker compose : UNIQUE par instance sur un meme serveur.
+# Vide = nom du dossier. Deux instances avec le meme nom se prennent leurs
+# conteneurs (make verifier refuse). A fixer AVANT le premier make up :
+# le changer ensuite recree les conteneurs et de nouveaux volumes OnlyOffice.
+# COMPOSE_PROJECT_NAME=nextcloud_codecommun
 
 # Versions des images (propres a cette instance). Ne pas les modifier a la main :
 #   make update     -> correctifs de ces versions

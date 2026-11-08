@@ -7,8 +7,10 @@ DC := docker compose
 # On ajoute sudo tout seul si on ne l'est pas.
 SUDO := $(shell [ "$$(id -u)" -eq 0 ] || echo sudo)
 
-# Point de montage de make mount (lisible par root seulement, comme data/).
-MOUNTPOINT ?= /tmp/borg-mount-nextcloud
+# Point de montage de make mount (lisible par root seulement, comme data/),
+# un par instance (nom du dossier... ou COMPOSE_PROJECT_NAME du .env).
+PROJET := $(or $(shell sed -n 's/^[[:space:]]*COMPOSE_PROJECT_NAME[[:space:]]*=[[:space:]]*//p' .env 2>/dev/null | tail -n1 | tr -d "'\""),$(notdir $(CURDIR)))
+MOUNTPOINT ?= /tmp/borg-mount-$(PROJET)
 
 help:
 	@echo "Stack Nextcloud — cibles disponibles :"
@@ -86,10 +88,10 @@ verifier:
 	@bash scripts/verifier_versions.sh
 
 update:
-	@$(SUDO) env OO_CONFIRME=$(OO_CONFIRME) bash scripts/update_nextcloud.sh
+	@$(SUDO) env OO_CONFIRME=$(OO_CONFIRME) TIMEOUT=$(TIMEOUT) bash scripts/update_nextcloud.sh
 
 upgrade:
-	@$(SUDO) env MIN_CORRECTIF=$(MIN_CORRECTIF) APPS_OK=$(APPS_OK) bash scripts/upgrade_nextcloud.sh
+	@$(SUDO) env MIN_CORRECTIF=$(MIN_CORRECTIF) APPS_OK=$(APPS_OK) TIMEOUT=$(TIMEOUT) bash scripts/upgrade_nextcloud.sh
 
 upgrade-check:
 	@env MIN_CORRECTIF=$(MIN_CORRECTIF) bash scripts/upgrade_nextcloud.sh --verifier

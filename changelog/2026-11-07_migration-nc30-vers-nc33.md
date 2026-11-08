@@ -41,7 +41,7 @@ make occ CMD="…"  commande occ
 |---|---|
 | `backup_nextcloud.sh` | mode maintenance → `pg_dump -Fc` → une archive borg de toute la stack → sortie de maintenance (garantie par un `trap`) → prune |
 | `check_backup.sh` | fraîcheur de l'archive, présence du dump, de `config.php`, des fichiers utilisateurs et du `.env` ; validation du dump avec `pg_restore` |
-| `update_nextcloud.sh` | sauvegarde → apps à jour → arrêt propre d'OnlyOffice → pull + redémarrage → attente de la migration → index/colonnes manquants → apps → reconnexion OnlyOffice |
+| `update_nextcloud.sh` | pull + garde-fous → sauvegarde → apps à jour → arrêt propre d'OnlyOffice → redémarrage → attente de la migration → index/colonnes manquants → apps → reconnexion OnlyOffice |
 | `onlyoffice_connect.sh` | pousse URL + secret JWT dans le connecteur, puis `occ onlyoffice:documentserver --check` |
 | `pg_upgrade.sh` | migration PostgreSQL par dump/restauration, avec comptage ligne à ligne et retour arrière automatique ; gère l'ancien et le nouveau montage du volume (prochaine fois : `make pg-upgrade PG_CIBLE=19`) |
 
@@ -176,7 +176,7 @@ Appliqué : `prepare4shutdown`, `docker compose up -d` (~1 min de coupure). Vér
 Pour qu'un seul dépôt serve plusieurs instances à des versions différentes (codecommun en 32, lamiete en 33), les tags d'images sortent du compose :
 
 - **`docker-compose.yml`** : `nextcloud:${NEXTCLOUD_TAG}`, `postgres:${POSTGRES_TAG}-bookworm`, `onlyoffice/documentserver:${ONLYOFFICE_TAG}`, montage `./database:${POSTGRES_MOUNT:-/var/lib/postgresql}` (`POSTGRES_MOUNT=/var/lib/postgresql/data` pour une base ≤ 17). Le compose est identique sur tous les serveurs.
-- **`.env`** de lamiete : `NEXTCLOUD_TAG=33`, `POSTGRES_TAG=18`, `ONLYOFFICE_TAG=10.0`. Images résolues identiques à avant : aucun conteneur recréé.
+- **`.env`** de lamiete : `NEXTCLOUD_TAG=33`, `POSTGRES_TAG=18`, `ONLYOFFICE_TAG=10.0`. Images résolues identiques à avant : aucun conteneur recréé sur le moment (mais, avec `env_file: .env`, PostgreSQL l'aurait été au `up` suivant : voir « Relecture complète »).
 - **`docker-compose.override.yml`** (local, ignoré par git) pour ce qui est propre à un serveur (`extra_hosts`…). Les scripts le chargent aussi : `docker compose -f docker-compose.yml` l'ignorait.
 
 Le problème à éviter, composant par composant :
@@ -202,6 +202,19 @@ Modifiés : `update_nextcloud.sh` (pull + garde-fous en étape 0, avant la sauve
 **La démarche, en résumé :** chaque composant a une seule commande pour changer de version (`make upgrade`, `make pg-upgrade`, `ONLYOFFICE_TAG` + `OO_CONFIRME=1`). `make update` ne fait que des correctifs. Les garde-fous refusent tout le reste avant de couper quoi que ce soit. Les versions vivent dans le `.env` de chaque instance, donc un `git pull` ne change jamais la version d'un serveur.
 
 Testé : les trois garde-fous passent sur l'installation actuelle ; refus vérifiés pour `POSTGRES_TAG=17/19`, mauvais `POSTGRES_MOUNT`, `NEXTCLOUD_TAG=32/34`, `ONLYOFFICE_TAG=10.1` ; `make upgrade-check` : « passerait de 33.0.10 à 34.0.5 », 9 apps compatibles ; édition du `.env` par `pg-upgrade` simulée pour 17 (ancien montage) → 18 et 18 → 19 ; `make onlyoffice` OK.
+
+### Relecture complète du dépôt (8 nov.)
+
+`make init` ajouté (adaptation root du script du kit BorgWarehouse, relu deux fois), puis relecture de tout le dépôt par un agent indépendant. Corrigé :
+
+- **Deux instances sur un même serveur se prenaient leurs conteneurs** si leurs dossiers avaient le même nom (projet compose = nom du dossier) : le `make up` de l'une recréait ceux de l'autre avec sa base. `COMPOSE_PROJECT_NAME` (unique par instance, vide pour lamiete) et refus dans `make verifier` si le nom est déjà pris par un autre dossier.
+- **Compose, PostgreSQL** : `env_file: .env` remplacé par les trois variables `POSTGRES_*` (le conteneur recevait aussi `JWT_SECRET`, et toute édition du `.env` — `NEXTCLOUD_TAG` par `make upgrade` — le recréait) ; healthcheck `pg_isready`, Nextcloud attend `service_healthy` (sa migration pouvait démarrer avant que la base réécoute) ; `stop_grace_period: 60s`. Appliqué par `make update` : PostgreSQL recréé une fois.
+- **Garde-fous** : refus si Nextcloud est installé mais `database/` ne contient aucune base (une base vide aurait été créée) ; `version.php` illisible n'est plus pris pour « pas installé » ; `POSTGRES_TAG` et `PG_CIBLE` doivent être un numéro seul ; OnlyOffice arrêté compte comme existant pour `OO_CONFIRME`.
+- **`pg_upgrade.sh`** : un échec juste après l'arrêt de PostgreSQL redémarre aussi la base ; plus de `compose config | grep -q` sous `pipefail` ; mot de passe superutilisateur lu dans le conteneur.
+- **`valeur_env`** ne retire plus que des guillemets encadrants (un secret contenant `'` ou `"` était altéré).
+- **`update_nextcloud.sh`** : la reconnexion OnlyOffice n'est plus bloquante (son échec faisait croire à `make upgrade` à une migration ratée) ; message explicite si la migration n'a pas tourné (`make occ CMD=upgrade`) ; `TIMEOUT` transmis par le Makefile.
+- **Multi-instances** : journal de sauvegarde, point de `make mount` et préfixe borg par défaut propres à l'instance ; `make init` demande l'heure de la sauvegarde ; `check_backup.sh` compare les chemins exacts (un `.env.bak` ne comptait plus pour `.env`).
+- **README** : prérequis (réseau `frontend`, `myresolver`, `crowdsec@file`, outils), installateur web, `COMPOSE_PROJECT_NAME`, procédure de bascule d'une instance existante (fichiers suivis modifiés, données suivies par l'ancien dépôt), PostgreSQL avant Nextcloud pour codecommun, pas de mise à jour pendant la sauvegarde.
 
 ---
 
@@ -274,7 +287,7 @@ Le journal d'accès (`TraefikV3/traefik.yml`) ne garde que les codes 200-299 et 
 
 **Revenir à OnlyOffice 9.4 :** remettre le tag `onlyoffice/documentserver:9.4`, puis `prepare4shutdown`, `docker compose up -d onlyoffice`, `make onlyoffice`. Le connecteur 10.2.1 accepte encore la 9.4.
 
-**Restaurer une archive borg :** `make list`, puis `borg extract` de l'archive `nuagefr-…` voulue (variables dans `scripts/.env`, clé SSH dans `scripts/.ssh/`). Le dump PostgreSQL est dans `scripts/pg-dump-nuagefr/`, à recharger avec `pg_restore` dans une base neuve de la **même version majeure** de PostgreSQL que celle du compose restauré.
+**Restaurer une archive borg :** `make list`, puis `borg extract` de l'archive `nuagefr-…` voulue (variables dans `scripts/.env` ; clé SSH : celle de root sur lamiete, `scripts/.ssh/` sur une instance configurée par `make init`). Le dump PostgreSQL est dans `scripts/pg-dump-nuagefr/`, à recharger avec `pg_restore` dans une base neuve de la **même version majeure** de PostgreSQL que celle du compose restauré.
 
 ---
 
@@ -303,6 +316,6 @@ Nouveautés (« Hub 26 Spring ») : diagramme de Gantt et dépendances dans Deck
 - [ ] Migrer `nuage.codecommun.coop` sur ce dépôt (procédure : README, « Passer une installation existante sur ce dépôt »). Points relevés dans `nextcloud32` :
   - OnlyOffice 9.1 y tourne par un fichier à part, `compose-onlyoffice.yml`, avec son propre PostgreSQL 12 et RabbitMQ, et un secret JWT généré au hasard. Ce fichier disparaît au changement de dépôt : arrêter cette stack **avant** (`docker compose -f compose-onlyoffice.yml down`). Notre service `onlyoffice` la remplace, avec le JWT du `.env` et `make onlyoffice`. Le saut de 9.1 à 10.0 est sans données à migrer, puisque les documents sont dans Nextcloud.
   - L'image est `postgres:17` (Debian trixie si elle a été tirée récemment) et le compose passe à `17-bookworm`. Une alerte « collation version mismatch » est possible : `make pg-upgrade PG_CIBLE=18`, juste après, reconstruit tout par dump/restauration.
-  - Il n'y a pas encore de sauvegarde borg : créer le dépôt BorgWarehouse et un `scripts/.env` avec un `BORG_PREFIX` propre à l'instance.
-- [ ] Puis : `.env` avec `ROUTER_NAME=codecommun` et ses versions **actuelles** (`NEXTCLOUD_TAG=32`, `POSTGRES_TAG=17`, `POSTGRES_MOUNT=/var/lib/postgresql/data`, à confirmer sur place), `make verifier`, puis `make update`, `make upgrade` (→ 33), `make pg-upgrade PG_CIBLE=18`. `extra_hosts` éventuels dans `docker-compose.override.yml`.
+  - Il n'y a pas encore de sauvegarde borg : `make init` (dépôt BorgWarehouse, `BORG_PREFIX` propre à l'instance, cron à une autre heure que lamiete).
+- [ ] Puis : `.env` avec `ROUTER_NAME=codecommun`, `COMPOSE_PROJECT_NAME` unique si une autre instance tourne sur le serveur, et ses versions **actuelles** (`NEXTCLOUD_TAG=32`, `POSTGRES_TAG=17`, `POSTGRES_MOUNT=/var/lib/postgresql/data`, à confirmer sur place), `make verifier`, `make up`, `make init`, puis `make update`, `make pg-upgrade PG_CIBLE=18` **avant** `make upgrade` (→ 33), à cause des collations. `extra_hosts` éventuels dans `docker-compose.override.yml`.
 - [ ] Archiver (plutôt que supprimer) `nextcloud31` et `nextcloud32` sur GitHub, avec un README « déplacé vers CoopCodeCommun/nextcloud » : la PR #1 de glungtung reste consultable.
