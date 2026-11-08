@@ -5,3 +5,5 @@ POSTGRES_HOST=
 DOMAIN=
 NEXTCLOUD_TRUSTED_DOMAINS=
 JWT_SECRET=
+# Suffixe des routeurs Traefik : unique par instance sur un meme Traefik (ex. lamiete, codecommun)
+ROUTER_NAME=

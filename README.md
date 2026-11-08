@@ -51,14 +51,23 @@ La logique vit dans `scripts/` ; le Makefile n'est qu'une table des matières.
 Deux fichiers, à ne jamais commiter (voir `.gitignore`), en `chmod 600` :
 
 - **`.env`** (stack) — copier `env_example` : `POSTGRES_*`, `DOMAIN`,
-  `NEXTCLOUD_TRUSTED_DOMAINS`, `JWT_SECRET`.
+  `NEXTCLOUD_TRUSTED_DOMAINS`, `JWT_SECRET`, `ROUTER_NAME`.
   Générer le secret OnlyOffice : `openssl rand -hex 32`.
+  `ROUTER_NAME` suffixe les routeurs Traefik : **unique par instance** si
+  plusieurs Nextcloud partagent le même Traefik (ex. `lamiete`, `codecommun`).
 - **`scripts/.env`** (sauvegarde) — copier `scripts/env_example` : `BORG_PREFIX`,
   `BORG_REPO`, `BORG_PASSPHRASE`, `NC_MAINTENANCE`, `AGE_MAX_HEURES`.
   Ces variables ne vont **pas** dans le `.env` de la stack : il est passé en
   entier au conteneur PostgreSQL (`env_file`).
 
 Puis : `make up`.
+
+Aucun port n'est publié sur l'hôte : tout passe par Traefik (réseau `frontend`),
+y compris les échanges Nextcloud ↔ OnlyOffice, qui utilisent les adresses
+publiques en HTTPS. Pas de `container_name` non plus : les conteneurs
+s'appellent `<dossier>-<service>-1`, et les scripts passent par
+`docker compose`. Si le serveur ne sait pas se joindre par sa propre IP
+publique, décommenter les `extra_hosts` du compose.
 
 ### 2. `config.php`
 
@@ -74,6 +83,7 @@ Puis : `make up`.
   array (
     0 => 'nuage.lamiete.fr',
   ),
+  'memcache.locking' => '\OC\Memcache\Redis',
   'redis' =>
   array (
     'host' => 'nextcloud_redis',
@@ -90,13 +100,15 @@ make occ CMD="db:add-missing-indices"
 make occ CMD="maintenance:repair --include-expensive"
 make occ CMD="config:system:set maintenance_window_start --type=integer --value=1"
 make occ CMD="config:system:set default_phone_region --value=FR"
+make occ CMD="config:system:set serverid --type=integer --value=1"
+make occ CMD="app:disable app_api"     # sauf si vous utilisez des Ex-Apps
 ```
 
 ### 4. Crontabs
 
 ```bash
 # crontab de l'utilisateur (tâches de fond Nextcloud)
-*/5 * * * * /usr/bin/docker exec --user www-data nextcloud_app php -f /var/www/html/cron.php
+*/5 * * * * /usr/bin/docker compose -f /poule/miete/nextcloud/docker-compose.yml exec -T -u www-data nextcloud_app php -f /var/www/html/cron.php
 
 # crontab root (sudo crontab -e) : la sauvegarde lit data/, propriété de www-data
 # (adapter le chemin du journal)

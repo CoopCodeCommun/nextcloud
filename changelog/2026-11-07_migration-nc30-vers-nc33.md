@@ -59,7 +59,7 @@ Le Document Server a aussi des volumes nommés (`onlyoffice_data`, `_lib`, `_log
 
 ### Autres changements du `docker-compose.yml`
 
-- `NC_skeletondirectory=` : plus de fichiers d'exemple dans le dossier des nouveaux utilisateurs.
+- `NC_skeletondirectory=` : plus de fichiers d'exemple dans le dossier des nouveaux utilisateurs. Contribution de Guillaume Lung Tung (@glungtung), PR #1 du dépôt `CoopCodeCommun/nextcloud31`, reportée ici.
 - Labels Traefik : un seul jeu de middlewares (`nextcloud_custom_header, nextcloud_redirectregex, crowdsec@file`), anciens doublons retirés.
 - **Suppression de la ligne `contentSecurityPolicy` / `frame-ancestors`** dans Traefik. Elle *remplaçait* la CSP envoyée par Nextcloud par une CSP minimale, ce qui retirait des protections. Nextcloud envoie déjà lui-même `frame-ancestors 'self'` et `X-Frame-Options: SAMEORIGIN`.
 - PostgreSQL : `postgres:18-bookworm`, monté sur `./database:/var/lib/postgresql` (nouvelle disposition de l'image 18, les données sont dans `database/18/docker`).
@@ -155,6 +155,21 @@ Résultat : « version 10.0.0.169 is successfully connected ». Retour arrière 
 - **AppAPI** : désactivée (`app:disable app_api`), aucune Ex-App utilisée. Supprime aussi une tâche de fond orpheline.
 - **`serverid`** : réglé à 1 (`config:system:set serverid --type=integer --value=1`), recommandé depuis la 33.
 - **Double authentification** : pas imposée pour l'instant. Pour les comptes Keycloak, elle se règlerait dans Keycloak.
+
+### Unification avec `nextcloud31` et `nextcloud32` (8 nov.)
+
+Les dépôts `CoopCodeCommun/nextcloud31` et `CoopCodeCommun/nextcloud32` (instance `nuage.codecommun.coop`) sont fusionnés dans celui-ci, avant leur suppression. Repris :
+- **`NC_skeletondirectory=`** (glungtung, nextcloud31) : déjà présent.
+- **`ROUTER_NAME`** (nextcloud32) : routeurs, services et middlewares Traefik suffixés (`nextcloud_lamiete`, `onlyoffice_lamiete`…), pour faire tourner plusieurs instances derrière le même Traefik. Variable obligatoire dans le `.env` (`ROUTER_NAME=lamiete` ici).
+- **Plus de `container_name`** (nextcloud32) : conteneurs `nextcloud-<service>-1`. Les scripts passaient déjà par `docker compose` ; seule la ligne `cron.php` de la crontab a changé (`docker compose -f … exec -T …`).
+- **Port `8090:80` retiré** (nextcloud32) : Nextcloud était joignable en HTTP simple depuis le réseau local, sans TLS ni CrowdSec. Rien ne l'utilisait (OnlyOffice passe par les adresses publiques en HTTPS).
+- **`extra_hosts`** (nextcloud32) : repris en option commentée, pour un serveur qui ne sait pas se joindre par sa propre IP publique.
+- **`memcache.locking` Redis** et **`app:disable app_api`** (README de nextcloud32) : ajoutés au README.
+- Au passage : le middleware de redirection https d'OnlyOffice, écrasé par le label suivant, est retiré (l'entrypoint `web` redirige déjà vers `websecure`).
+
+Non repris : `compose-onlyoffice.yml` (OnlyOffice avec PostgreSQL 12 et RabbitMQ séparés), `frame-ancestors` (retiré volontairement), `postgres:17` et OnlyOffice 9.1 (dépassés).
+
+Appliqué : `prepare4shutdown`, `docker compose up -d` (~1 min de coupure). Vérifié : site 200, OnlyOffice « 10.0.0.169 is successfully connected », redirection CalDAV, HSTS, port 8090 fermé, `cron.php` OK.
 
 ---
 
@@ -253,3 +268,5 @@ Nouveautés (« Hub 26 Spring ») : diagramme de Gantt et dépendances dans Deck
 - [ ] Prévenir les membres : document OnlyOffice vide → désactiver le bloqueur de pub sur onlyoffice.lamiete.fr.
 - [ ] Double authentification : pas imposée pour l'instant (décision du 8 nov.) ; à régler dans Keycloak le jour venu.
 - [ ] Nextcloud 34 (voir ci-dessus).
+- [ ] Supprimer les dépôts `nextcloud31` et `nextcloud32` une fois l'instance codecommun passée sur ce dépôt.
+- [ ] Migrer `nuage.codecommun.coop` sur ce dépôt (`ROUTER_NAME=codecommun`).

@@ -2,7 +2,6 @@ services:
   nextcloud_db:
     image: postgres:18-bookworm
     hostname: nextcloud_db
-    container_name: nextcloud_db
     restart: always
     volumes:               
      - ./database:/var/lib/postgresql
@@ -11,7 +10,6 @@ services:
       - nextcloud_db      
 
   nextcloud_redis:
-    container_name: nextcloud_redis
     hostname: nextcloud_redis
     image: redis:7.4
     restart: always
@@ -19,12 +17,9 @@ services:
       - nextcloud_db
 
   nextcloud_app:  
-    container_name: nextcloud_app
     hostname: nextcloud_app
     image: nextcloud:33
     restart: always
-    ports:
-      - 8090:80
     depends_on:
       - nextcloud_db
     volumes:
@@ -35,27 +30,34 @@ services:
     networks:
       - nextcloud_db
       - frontend
+    # Option (repris de nextcloud32) : si le serveur ne sait pas se joindre par
+    # sa propre IP publique (NAT sans hairpin), faire pointer les noms vers la
+    # passerelle du reseau frontend (docker network inspect frontend).
+    # extra_hosts:
+    #   - "nuage.$DOMAIN:172.18.0.1"
+    #   - "onlyoffice.$DOMAIN:172.18.0.1"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
-      - "traefik.http.routers.nextcloud.tls.certresolver=myresolver"
-      - "traefik.http.routers.nextcloud.rule=Host(`nuage.$DOMAIN`)"
-      - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+      # Noms de routeurs, services et middlewares suffixes par ROUTER_NAME (.env) :
+      # plusieurs instances peuvent partager le meme Traefik sans collision.
+      - "traefik.http.routers.nextcloud_${ROUTER_NAME:?ROUTER_NAME doit etre renseigne dans .env}.tls.certresolver=myresolver"
+      - "traefik.http.routers.nextcloud_${ROUTER_NAME}.rule=Host(`nuage.$DOMAIN`)"
+      - "traefik.http.services.nextcloud_${ROUTER_NAME}.loadbalancer.server.port=80"
       # Une seule ligne : deux labels "middlewares" sur le meme router, le second ecrase le premier.
-      - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex, crowdsec@file"
+      - "traefik.http.routers.nextcloud_${ROUTER_NAME}.middlewares=nextcloud_custom_header_${ROUTER_NAME}, nextcloud_redirectregex_${ROUTER_NAME}, crowdsec@file"
 
         # HSTS uniquement. Pas de contentSecurityPolicy ici : Traefik REMPLACERAIT
         # la CSP complete de Nextcloud (qui gere deja frame-ancestors et le
         # frame-src d'OnlyOffice).
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
+      - "traefik.http.middlewares.nextcloud_custom_header_${ROUTER_NAME}.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
 
         # redirection nécéssaire au desktop client et autres webdav
-      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
-      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
-      - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav"
+      - "traefik.http.middlewares.nextcloud_redirectregex_${ROUTER_NAME}.redirectregex.permanent=true"
+      - "traefik.http.middlewares.nextcloud_redirectregex_${ROUTER_NAME}.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav"
+      - "traefik.http.middlewares.nextcloud_redirectregex_${ROUTER_NAME}.redirectregex.replacement=https://$${1}/remote.php/dav"
 
   onlyoffice:
-    container_name: onlyoffice
     hostname: onlyoffice
     # 10.0 : suit les correctifs 10.0.x (make update). Avant de passer en 10.1
     # ou 11, verifier que le connecteur (app onlyoffice de Nextcloud) la supporte.
@@ -63,6 +65,12 @@ services:
     restart: always
     networks:
       - frontend
+    # Option (repris de nextcloud32) : si le serveur ne sait pas se joindre par
+    # sa propre IP publique (NAT sans hairpin), faire pointer les noms vers la
+    # passerelle du reseau frontend (docker network inspect frontend).
+    # extra_hosts:
+    #   - "nuage.$DOMAIN:172.18.0.1"
+    #   - "onlyoffice.$DOMAIN:172.18.0.1"
     environment:
       # Cle partagee avec Nextcloud : la meme valeur est poussee dans l'app
       # onlyoffice par scripts/onlyoffice_connect.sh (make onlyoffice).
@@ -82,20 +90,18 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"
-      - "traefik.http.routers.onlyoffice.tls.certresolver=myresolver"
-      - "traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.$DOMAIN`)"
-      - "traefik.http.services.onlyoffice.loadbalancer.server.port=80"
-      
-      - "traefik.http.routers.onlyoffice.entrypoints=websecure"
-      - "traefik.http.routers.onlyoffice.middlewares=onlyoffice-https-redirect"
-      - "traefik.http.middlewares.onlyoffice-https-redirect.redirectscheme.scheme=https"
-
-      - "traefik.http.routers.onlyoffice.middlewares=onlyoffice_custom_header"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.referrerPolicy=no-referrer"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.onlyoffice_custom_header.headers.customRequestHeaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.onlyoffice_${ROUTER_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.routers.onlyoffice_${ROUTER_NAME}.rule=Host(`onlyoffice.$DOMAIN`)"
+      - "traefik.http.services.onlyoffice_${ROUTER_NAME}.loadbalancer.server.port=80"
+      - "traefik.http.routers.onlyoffice_${ROUTER_NAME}.entrypoints=websecure"
+      # Une seule ligne middlewares (l'ancienne redirection https etait ecrasee
+      # par la suivante, et inutile : l'entrypoint web redirige deja vers websecure).
+      - "traefik.http.routers.onlyoffice_${ROUTER_NAME}.middlewares=onlyoffice_custom_header_${ROUTER_NAME}"
+      - "traefik.http.middlewares.onlyoffice_custom_header_${ROUTER_NAME}.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
+      - "traefik.http.middlewares.onlyoffice_custom_header_${ROUTER_NAME}.headers.referrerPolicy=no-referrer"
+      - "traefik.http.middlewares.onlyoffice_custom_header_${ROUTER_NAME}.headers.forceSTSHeader=true"
+      - "traefik.http.middlewares.onlyoffice_custom_header_${ROUTER_NAME}.headers.browserXssFilter=true"
+      - "traefik.http.middlewares.onlyoffice_custom_header_${ROUTER_NAME}.headers.customRequestHeaders.X-Forwarded-Proto=https"
       
 
 networks:
