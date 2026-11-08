@@ -19,12 +19,17 @@ services:
     # "Pret" = accepte les connexions : Nextcloud attend ce feu vert pour
     # demarrer (sa migration d'une montee de version echouerait sur une base
     # qui redemarre encore).
+    # -h 127.0.0.1 : en TCP. Pendant l'initialisation d'une base neuve, le
+    # serveur temporaire ne repond que sur la socket Unix.
+    # start_period long (verifie toutes les 2 s, donc sans attente inutile) :
+    # apres une coupure brutale, la recuperation peut durer, et un "unhealthy"
+    # empecherait make up de demarrer Nextcloud.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -q -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      test: ["CMD-SHELL", "pg_isready -q -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 60s
+      retries: 6
+      start_period: 300s
       start_interval: 2s
     # Arret propre (checkpoint) au lieu d'un SIGKILL au bout de 10 s.
     stop_grace_period: 60s

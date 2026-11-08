@@ -36,6 +36,7 @@ compose() {
 valeur_env() {
   local v
   v="$(sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$STACK_ENV" | tail -n1)"
+  v="${v%"${v##*[![:space:]]}"}"   # espaces de fin, comme compose
   case "$v" in
     \'*\') v="${v#\'}"; v="${v%\'}" ;;
     \"*\") v="${v#\"}"; v="${v%\"}" ;;
@@ -126,9 +127,12 @@ verifier_tags() {
 # dossier). Deux instances avec le MEME nom se prennent leurs conteneurs : le
 # `up` de l'une recree ceux de l'autre avec sa propre config (sa base, son
 # dossier data/). On refuse si ce nom est deja utilise par un autre dossier.
+# Meme regle que compose : variable du shell, sinon .env, sinon nom du dossier
+# normalise (minuscules, seulement a-z 0-9 _ -) ; ex. "Proj.Test" -> "projtest".
 nom_projet() {
-  local n; n="$(valeur_env COMPOSE_PROJECT_NAME)"
-  [ -n "$n" ] || n="$(basename "$STACK_DIR")"
+  local n="${COMPOSE_PROJECT_NAME:-}"
+  [ -n "$n" ] || n="$(valeur_env COMPOSE_PROJECT_NAME)"
+  [ -n "$n" ] || n="$(basename "$STACK_DIR" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9_-')"
   printf '%s\n' "$n"
 }
 verifier_projet() {
@@ -165,12 +169,16 @@ verifier_postgres() {
     # Nextcloud tournerait dessus. database/ deplace ? retour arriere rate ?
     local nc
     nc="$(nc_version_installee)" || return 1
-    if [ -n "$nc" ]; then
+    if [ -n "$nc" ] && [ "${BASE_NEUVE:-0}" != 1 ]; then
       echo "[versions] ERREUR : Nextcloud $nc est installe, mais database/ ne contient aucune base." >&2
       echo "           Une base vide serait creee. Chercher l'ancienne (database.pg*/," >&2
       echo "           database.echec-*/) ou restaurer la sauvegarde (make list)." >&2
+      echo "           Restauration d'une archive borg (base neuve VOULUE) : demarrer la" >&2
+      echo "           base seule (docker compose up -d nextcloud_db), y recharger le dump," >&2
+      echo "           puis make up. Ou, en connaissance de cause : BASE_NEUVE=1 make up" >&2
       return 1
     fi
+    [ -z "$nc" ] || echo "[versions] [WARN] BASE_NEUVE=1 : base PostgreSQL vide creee pour Nextcloud $nc (a restaurer)."
     echo "[versions] PostgreSQL : pas encore de base (nouvelle installation) -> PG $tag."
     return 0
   fi

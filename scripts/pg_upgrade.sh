@@ -94,7 +94,9 @@ compose stop "$APP_SERVICE"
 # La base aussi : un echec a l'etape 4 (cp, mv) survient apres son arret, et
 # database/ est alors toujours en place.
 trap 'echo "[pg-upgrade] ECHEC avant changement de base : redemarrage de la base et de Nextcloud." >&2;
-      compose start "$DB_SERVICE" "$APP_SERVICE"; sleep 10; occ maintenance:mode --off || true' EXIT
+      compose start "$DB_SERVICE" "$APP_SERVICE";
+      for i in $(seq 1 30); do occ maintenance:mode --off </dev/null >/dev/null 2>&1 && break; sleep 5; done;
+      occ maintenance:mode --off </dev/null || echo "[pg-upgrade] sortir du mode maintenance a la main : make occ CMD=\"maintenance:mode --off\"" >&2' EXIT
 
 
 #### 3. DUMP + COMPTAGE ####

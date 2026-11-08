@@ -123,7 +123,10 @@ ecrire_env NEXTCLOUD_TAG "$CIBLE"
 # Echec avant la migration (sauvegarde ratee...) : on remet le tag, sinon le
 # prochain make up / update tenterait la majeure sans verification.
 remettre_tag() {
-  if [ "$(majeure "$(nc_version_installee)")" = "$N" ]; then
+  local v
+  # Version illisible : on ne sait pas ou en est la migration, on ne touche a rien.
+  v="$(nc_version_installee)" || { echo "[nc-upgrade] ECHEC, version installee illisible : NEXTCLOUD_TAG laisse a $CIBLE." >&2; return; }
+  if [ "$(majeure "$v")" = "$N" ]; then
     ecrire_env NEXTCLOUD_TAG "$TAG"
     echo "[nc-upgrade] ECHEC avant la migration : NEXTCLOUD_TAG remis a $TAG." >&2
   else

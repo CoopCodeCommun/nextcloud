@@ -255,14 +255,17 @@ docker compose exec -T nextcloud_db sh -c 'pg_dump -U "$POSTGRES_USER" -Fc "$POS
 
 # 1. Garder une trace de l'existant
 git status --short > ~/avant-unification/status.txt
-git diff           > ~/avant-unification/modifs-locales.diff   # retouches faites sur le serveur
+git diff HEAD      > ~/avant-unification/modifs-locales.diff   # retouches faites sur le serveur (indexées ou non)
 cp -a docker-compose.yml compose-onlyoffice.yml README.md .env ~/avant-unification/ 2>/dev/null
 docker compose ps; docker ps --filter name=onlyoffice          # ce qui tourne vraiment
 
 # 1 bis. L'ancien dépôt ne doit suivre AUCUNE donnée ni secret : le checkout
 #        de l'étape 3 SUPPRIME les fichiers suivis qui n'existent pas ici.
 git ls-files | grep -E '^(\.env|data/|database/)'   # doit ne rien afficher, sinon :
-# git rm -r --cached <ces chemins>    (les retire de git, PAS du disque)
+# git rm -r --cached <ces chemins> && git commit -m "ne plus suivre les donnees"
+#   (les retire de git, PAS du disque). Le commit est INDISPENSABLE : sans lui,
+#   le `git reset --hard` de l'étape 3 les remettrait dans leur version suivie.
+# Vérifier ensuite : la commande ci-dessus n'affiche plus rien.
 
 # 2. Arrêter l'ancienne stack AVEC l'ancien compose (il connaît ses container_name)
 docker compose -f compose-onlyoffice.yml down    # seulement si OnlyOffice tournait par lui
@@ -271,7 +274,7 @@ docker compose down
 # 3. Basculer sur ce dépôt. Les fichiers suivis modifiés sur place (tracés à
 #    l'étape 1 dans modifs-locales.diff) font refuser le checkout : on les
 #    remet d'abord comme dans l'ancien dépôt.
-git checkout -- .
+git reset --hard                     # fichiers SUIVIS seulement : .env/data/database intacts
 git remote set-url origin git@github.com:CoopCodeCommun/nextcloud.git
 git fetch origin
 git checkout -B main origin/main     # remplace les fichiers suivis, garde .env/data/database

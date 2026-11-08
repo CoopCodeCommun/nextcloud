@@ -287,7 +287,7 @@ Le journal d'accès (`TraefikV3/traefik.yml`) ne garde que les codes 200-299 et 
 
 **Revenir à OnlyOffice 9.4 :** remettre le tag `onlyoffice/documentserver:9.4`, puis `prepare4shutdown`, `docker compose up -d onlyoffice`, `make onlyoffice`. Le connecteur 10.2.1 accepte encore la 9.4.
 
-**Restaurer une archive borg :** `make list`, puis `borg extract` de l'archive `nuagefr-…` voulue (variables dans `scripts/.env` ; clé SSH : celle de root sur lamiete, `scripts/.ssh/` sur une instance configurée par `make init`). Le dump PostgreSQL est dans `scripts/pg-dump-nuagefr/`, à recharger avec `pg_restore` dans une base neuve de la **même version majeure** de PostgreSQL que celle du compose restauré.
+**Restaurer une archive borg :** `make list`, puis `borg extract` de l'archive `nuagefr-…` voulue (variables dans `scripts/.env` ; clé SSH : celle de root sur lamiete, `scripts/.ssh/` sur une instance configurée par `make init`). Le dump PostgreSQL est dans `scripts/pg-dump-nuagefr/`, à recharger avec `pg_restore` dans une base neuve de la **même version majeure** de PostgreSQL que celle du compose restauré. `database/` n'étant pas dans l'archive, `make up` refuse (Nextcloud installé sans base) : démarrer la base seule (`docker compose up -d nextcloud_db`, base neuve créée par l'image), `pg_restore`, puis `make up`.
 
 ---
 

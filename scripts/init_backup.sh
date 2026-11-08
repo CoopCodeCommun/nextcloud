@@ -179,7 +179,7 @@ echo
 # Depot deja dans scripts/.env : le prefixe nomme sa cle SSH (deja connue de
 # BWH), on ne le change pas.
 if [ "$REPRISE" = 0 ] && [ "$DEPOT_PREVU" = 0 ]; then
-  BORG_PREFIX="$(demander "Prefixe des archives (nomme aussi la cle SSH)" "${BORG_PREFIX:-nextcloud-${ROUTER_NAME:-$(hostname -s)}}")"
+  BORG_PREFIX="$(demander "Prefixe des archives (nomme aussi la cle SSH)" "${BORG_PREFIX:-nextcloud-$(printf '%s' "${ROUTER_NAME:-$(hostname -s)}" | tr -cd 'a-zA-Z0-9_-')}")"
   # Un prefixe avec des espaces casserait le nom des archives et le glob du prune.
   case "$BORG_PREFIX" in
     ''|*[!a-zA-Z0-9_-]*) erreur "prefixe invalide : lettres, chiffres, - et _ uniquement." ;;

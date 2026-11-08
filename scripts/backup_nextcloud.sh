@@ -32,8 +32,8 @@ set -euo pipefail
 # en ROOT (cron root). Le Makefile ajoute sudo tout seul.
 #
 # CONFIGURATION : aucun secret ici. Tout est dans scripts/.env (chmod 600,
-# ignore par git). PAS dans le .env de la stack : le compose le passe en entier
-# au conteneur PostgreSQL (env_file), la passphrase s'y retrouverait.
+# ignore par git). PAS dans le .env de la stack : la passphrase n'a rien a
+# faire avec les variables du compose.
 #####
 
 ## Surveillance optionnelle via Sentry (l'ancien backup.sh l'utilisait) :
