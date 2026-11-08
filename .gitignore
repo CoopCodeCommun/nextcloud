@@ -1,0 +1,15 @@
+# Secrets
+.env
+.env.*
+scripts/.env
+scripts/.ssh/
+
+# Donnees (sauvegardees par borg, pas par git)
+data/
+database/
+database.*/
+
+# Fichiers de travail des scripts
+scripts/pg-dump-*/
+scripts/pg-upgrade/
+scripts/.backup-*.lock

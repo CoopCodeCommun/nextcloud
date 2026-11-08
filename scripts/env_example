@@ -1,0 +1,15 @@
+# Copier en scripts/.env puis : chmod 600 .env
+# NE PAS mettre ces variables dans le .env de la stack : le compose le passe
+# en entier au conteneur PostgreSQL (env_file).
+
+# Prefixe des archives (garder "nuagefr" : continuite avec l'historique)
+BORG_PREFIX=nuagefr
+# Adresse du depot sur borgwarehouse
+BORG_REPO=ssh://borgwarehouse@localhost:2226/./XXXXXXXX
+# Passphrase du depot — AU COFFRE, avec `borg key export`
+BORG_PASSPHRASE=''
+
+# 1 = mode maintenance Nextcloud pendant dump + archive (coherence base/fichiers)
+NC_MAINTENANCE=1
+# Age max de la derniere archive avant que `make check` crie (heures)
+AGE_MAX_HEURES=25

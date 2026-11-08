@@ -1,11 +1,11 @@
 services:
   nextcloud_db:
-    image: postgres:13-bookworm
+    image: postgres:18-bookworm
     hostname: nextcloud_db
     container_name: nextcloud_db
     restart: always
     volumes:               
-     - ./database:/var/lib/postgresql/data                   
+     - ./database:/var/lib/postgresql
     env_file: .env   
     networks:            
       - nextcloud_db      
@@ -21,7 +21,7 @@ services:
   nextcloud_app:  
     container_name: nextcloud_app
     hostname: nextcloud_app
-    image: nextcloud:30
+    image: nextcloud:33
     restart: always
     ports:
       - 8090:80
@@ -29,6 +29,9 @@ services:
       - nextcloud_db
     volumes:
       - ./data/www/html:/var/www/html
+    environment:
+      # Pas de fichiers d'exemple dans le dossier des nouveaux utilisateurs
+      - NC_skeletondirectory=
     networks:
       - nextcloud_db
       - frontend
@@ -38,12 +41,13 @@ services:
       - "traefik.http.routers.nextcloud.tls.certresolver=myresolver"
       - "traefik.http.routers.nextcloud.rule=Host(`nuage.$DOMAIN`)"
       - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+      # Une seule ligne : deux labels "middlewares" sur le meme router, le second ecrase le premier.
+      - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex, crowdsec@file"
 
-      - "traefik.http.routers.nextcloud.middlewares=nextcloud_custom_header, nextcloud_redirectregex"
-
-        # Pour le chargement de scripts extérieurs, ex : onlyoffice
+        # HSTS uniquement. Pas de contentSecurityPolicy ici : Traefik REMPLACERAIT
+        # la CSP complete de Nextcloud (qui gere deja frame-ancestors et le
+        # frame-src d'OnlyOffice).
       - "traefik.http.middlewares.nextcloud_custom_header.headers.customResponseHeaders.Strict-Transport-Security=max-age=15552000; includeSubDomains; preload;"
-      - "traefik.http.middlewares.nextcloud_custom_header.headers.contentSecurityPolicy=frame-ancestors 'self' ${DOMAIN} onlyoffice.${DOMAIN} "
 
         # redirection nécéssaire au desktop client et autres webdav
       - "traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true"
@@ -53,13 +57,25 @@ services:
   onlyoffice:
     container_name: onlyoffice
     hostname: onlyoffice
-    image: onlyoffice/documentserver:latest
+    # 10.0 : suit les correctifs 10.0.x (make update). Avant de passer en 10.1
+    # ou 11, verifier que le connecteur (app onlyoffice de Nextcloud) la supporte.
+    image: onlyoffice/documentserver:10.0
     restart: always
     networks:
       - frontend
     environment:
-      JWT_SECRET: ${JWT_SECRET}
+      # Cle partagee avec Nextcloud : la meme valeur est poussee dans l'app
+      # onlyoffice par scripts/onlyoffice_connect.sh (make onlyoffice).
+      JWT_ENABLED: "true"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET doit etre renseigne dans .env}
+      JWT_HEADER: Authorization
       ENABLE_SSL: true
+    volumes:
+      # Volumes nommes : survivent a un `docker compose down` (les anonymes non).
+      - onlyoffice_data:/var/www/onlyoffice/Data
+      - onlyoffice_lib:/var/lib/onlyoffice
+      - onlyoffice_logs:/var/log/onlyoffice
+      - onlyoffice_fonts:/usr/share/fonts/truetype/custom
     expose:
       - '80'
       - '443'
@@ -87,3 +103,9 @@ networks:
     external: true
   nextcloud_db:
     internal: true
+
+volumes:
+  onlyoffice_data:
+  onlyoffice_lib:
+  onlyoffice_logs:
+  onlyoffice_fonts:
